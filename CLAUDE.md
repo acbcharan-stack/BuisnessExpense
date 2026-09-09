@@ -25,5 +25,5 @@ India**. Next.js 16 (App Router) on Vercel · Supabase (Postgres + Auth + Storag
 
 ## Build order
 
-Phase 0 (foundations) is done. Next: Phase 1 — Storage upload, `extraction_jobs`
-runner, Gemini structured extraction, review screen.
+Phase 0 done. Phase 1 in progress — see `docs/phase-1-progress.md` for exactly
+where to resume (backend + Inbox built; review screen `/records/[id]` not built).
