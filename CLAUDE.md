@@ -25,5 +25,6 @@ India**. Next.js 16 (App Router) on Vercel · Supabase (Postgres + Auth + Storag
 
 ## Build order
 
-Phase 0 done. Phase 1 in progress — see `docs/phase-1-progress.md` for exactly
-where to resume (backend + Inbox built; review screen `/records/[id]` not built).
+Phase 0 done. Phase 1 code-complete (backend + Inbox + review screen
+`/records/[id]` built) — needs a live end-to-end test then a commit. See
+`docs/phase-1-progress.md` for exactly where to resume.

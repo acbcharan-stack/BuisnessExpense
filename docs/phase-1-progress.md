@@ -3,8 +3,10 @@
 _Last worked: 2026-09-10. Say "continue work" to pick this up._
 
 Full plan: `~/.claude/plans/wobbly-twirling-dragonfly.md`. Phase 0 is committed and
-pushed (`main`). Phase 1 is **partly done** — the capture + extraction backend and
-the Inbox UI are built; the **review screen is not**.
+pushed (`main`). Phase 1 is **feature-complete pending live-data testing** — the
+capture + extraction backend, the Inbox UI, **and the review screen** are built.
+The only thing left is a real end-to-end test against a live Supabase project +
+`GEMINI_API_KEY` (see Blockers), then commit.
 
 ---
 
@@ -19,25 +21,26 @@ the Inbox UI are built; the **review screen is not**.
 | Retry API | `app/api/documents/[id]/retry/route.ts` (POST), `app/api/cron/retry/route.ts` (GET, `CRON_SECRET` bearer) |
 | Cron | `vercel.json` — hourly `/api/cron/retry` (Vercel Hobby throttles crons to daily; the inline path at upload is primary, plus the manual Retry button) |
 | Inbox UI | `app/(app)/inbox/page.tsx` rewritten: `UploadDropzone` (drag/drop, multi-file), "Needs review" list, "Recent uploads" with `RetryButton` |
-| Review (partial) | `app/(app)/records/[id]/form-schema.ts` (Zod `recordFormSchema` + `RecordFormValues`), `app/(app)/records/[id]/actions.ts` (`saveRecord`, `confirmRecord` — role-gated to owner/accountant) |
+| Review actions | `app/(app)/records/[id]/form-schema.ts` (Zod `recordFormSchema` + `RecordFormValues`), `app/(app)/records/[id]/actions.ts` (`saveRecord`, `confirmRecord` — save open to any writer, confirm role-gated to owner/accountant) |
+| Review screen | `app/(app)/records/[id]/page.tsx` (server: loads expense + document + line items + taxes + categories + vendor list + signed URL + latest job for confidence; `notFound()` on bad id), `app/(app)/records/[id]/review-form.tsx` (client: two-pane — doc preview left, editable fields right; `record_type` toggle, vendor `<datalist>`, category `<select>` + new-category field, editable line-item & tax grids, Save / Save&confirm; read-only banner when status ≠ `review`; image `onError` fallback; redirects to `/inbox` on confirm) |
+| List → review links | `app/(app)/records-list.tsx` — every cell wrapped in `<Link href={`/records/${r.id}`}>` with row hover |
+| Tests | `lib/extraction/match.test.ts` (`normalizeVendorName`, 6 cases) |
+| Vitest config | `vitest.config.mts` — aliases `server-only` → `vitest/server-only-stub.ts` so `lib/extraction/match.ts` is importable in tests |
 
-Checkpoint state: `npm run typecheck`, `lint`, `test` (16), and `next build` all pass.
+Checkpoint state: `npm run typecheck`, `lint`, `test` (21), and `next build` all pass.
 
 ---
 
 ## Next steps (do these to finish Phase 1)
 
-1. **Build the review screen** — the Inbox already links to `/records/{expenseId}` but that route has no `page.tsx` yet.
-   - `app/(app)/records/[id]/page.tsx` (server): load the expense by id (`notFound()` if missing), plus its `documents` row, `expense_line_items` (ordered by `line_no`), `expense_taxes`, all `categories`, a vendor list (`id, name`, limit ~500), and a signed URL via `createSignedDocumentUrl`. Compute `canManage` from `requireProfile()` role. Pass all to `<ReviewForm/>`.
-   - `app/(app)/records/[id]/review-form.tsx` (client): two-pane layout.
-     - Left: document preview — `<img>` for image mime, `<iframe>` for `application/pdf`.
-     - Right: fields matching `RecordFormValues` — `record_type` toggle (moves item between Invoices/Expenses tabs), vendor name (text + `<datalist>` of existing), category `<select>` + inline "New category…" (`new_category_name`), `invoice_number`, `invoice_date`/`due_date` (date inputs), `currency`, `country`, `subtotal`/`tax_total`/`total`, `notes`, editable **line items** table (add/remove rows), editable **taxes** table (add/remove; `tax_type` from `TAX_TYPES`).
-     - Buttons: **Save** → `saveRecord(expenseId, values)`; **Confirm** → `confirmRecord(expenseId)`, render only when `canManage`.
-     - Show extraction `notes` + `confidence` from the latest `extraction_jobs.raw_response` if handy (optional).
-2. **Link list rows to review** — in `app/(app)/records-list.tsx` wrap each row in `<Link href={`/records/${r.id}`}>`.
-3. **Manual test** (needs live Supabase + `GEMINI_API_KEY` — see below): upload a real invoice via Inbox → confirm a `documents` row + `extraction_jobs` row + `expenses` row (status `review`) appear → open review screen → edit + Save → Confirm → row moves to Invoices/Expenses tab.
-4. **Add tests**: `lib/extraction/match.test.ts` for `normalizeVendorName`; consider a `recordFormSchema` parse test.
-5. Commit; then Phase 2 (PWA + camera + email intake) or Phase 3 (dashboard + CSV/Zoho export).
+1. **Manual end-to-end test** (needs live Supabase + `GEMINI_API_KEY` — see Blockers): upload a real invoice via Inbox → confirm a `documents` row + `extraction_jobs` row + `expenses` row (status `review`) appear → open review screen → check the preview renders, edit fields + Save → Save&confirm → row leaves the Inbox queue and appears in the Invoices/Expenses tab with status `confirmed`.
+2. Consider a `recordFormSchema` parse test (edge cases: empty money strings → null, bad dates rejected).
+3. Commit; then Phase 2 (PWA + camera + email intake) or Phase 3 (dashboard + CSV/Zoho export).
+
+### Known follow-ups / polish ideas for the review screen
+- `currency` / `country` are free-text inputs — could become `<select>`s later.
+- No client-side "totals don't add up" warning yet (subtotal + tax_total vs total).
+- HEIC uploads won't preview inline in most browsers — handled with an "Open original" fallback, not a conversion.
 
 ---
 

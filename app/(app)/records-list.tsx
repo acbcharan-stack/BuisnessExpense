@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/page-header";
 import type { RecordType } from "@/lib/types";
@@ -62,24 +63,51 @@ export async function RecordsList({ recordType }: { recordType: RecordType }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td className="px-4 py-2 tabular-nums">{r.invoice_date ?? "—"}</td>
-              <td className="px-4 py-2">
-                {r.vendor_id ? (vendorName.get(r.vendor_id) ?? "—") : "—"}
-              </td>
-              <td className="px-4 py-2">{r.invoice_number ?? "—"}</td>
-              <td className="px-4 py-2">
-                {r.category_id ? (categoryName.get(r.category_id) ?? "—") : "—"}
-              </td>
-              <td className="px-4 py-2 text-right tabular-nums">
-                {r.total != null
-                  ? `${r.currency} ${Number(r.total).toLocaleString("en-IN")}`
-                  : "—"}
-              </td>
-              <td className="px-4 py-2 text-xs text-zinc-500">{r.status}</td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const href = `/records/${r.id}`;
+            const cell = "px-4 py-2";
+            return (
+              <tr
+                key={r.id}
+                className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+              >
+                <td className={`${cell} tabular-nums`}>
+                  <Link href={href} className="block">
+                    {r.invoice_date ?? "—"}
+                  </Link>
+                </td>
+                <td className={cell}>
+                  <Link href={href} className="block">
+                    {r.vendor_id ? (vendorName.get(r.vendor_id) ?? "—") : "—"}
+                  </Link>
+                </td>
+                <td className={cell}>
+                  <Link href={href} className="block">
+                    {r.invoice_number ?? "—"}
+                  </Link>
+                </td>
+                <td className={cell}>
+                  <Link href={href} className="block">
+                    {r.category_id
+                      ? (categoryName.get(r.category_id) ?? "—")
+                      : "—"}
+                  </Link>
+                </td>
+                <td className={`${cell} text-right tabular-nums`}>
+                  <Link href={href} className="block">
+                    {r.total != null
+                      ? `${r.currency} ${Number(r.total).toLocaleString("en-IN")}`
+                      : "—"}
+                  </Link>
+                </td>
+                <td className={`${cell} text-xs text-zinc-500`}>
+                  <Link href={href} className="block">
+                    {r.status}
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
