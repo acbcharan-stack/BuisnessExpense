@@ -20,7 +20,7 @@ export default async function ExpensesPage() {
           canManage ? <ExportButton type="expense" label="Export expenses" /> : null
         }
       />
-      <RecordsList recordType="expense" />
+      <RecordsList recordType="expense" canManage={canManage} />
     </>
   );
 }

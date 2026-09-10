@@ -24,7 +24,7 @@ export default async function InvoicesPage() {
           ) : null
         }
       />
-      <RecordsList recordType="invoice" />
+      <RecordsList recordType="invoice" canManage={canManage} />
     </>
   );
 }

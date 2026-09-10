@@ -21,6 +21,7 @@ export interface ReviewFormData {
     mimeType: string | null;
     filename: string | null;
     signedUrl: string | null;
+    downloadUrl: string | null;
   };
   categories: {
     id: string;
@@ -314,14 +315,14 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
     setFeedback(null);
   }
 
-  const { mimeType, filename, signedUrl } = data.document;
+  const { mimeType, filename, signedUrl, downloadUrl } = data.document;
   const showImg = signedUrl && mimeType?.startsWith("image/") && !imgBroken;
   const showPdf = signedUrl && mimeType === "application/pdf";
 
   return (
     <div className="grid gap-6 pb-24 lg:grid-cols-2 lg:pb-6">
       {/* Left: document preview */}
-      <div className="lg:sticky lg:top-20 lg:self-start">
+      <div className="lg:sticky lg:top-6 lg:self-start">
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between border-b border-zinc-100 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800">
             <span className="flex items-center gap-1.5 truncate">
@@ -331,14 +332,24 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
               </span>
             </span>
             {signedUrl && (
-              <a
-                href={signedUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="shrink-0 font-medium text-blue-600 hover:underline dark:text-blue-400"
-              >
-                Open ↗
-              </a>
+              <span className="flex shrink-0 items-center gap-3">
+                <a
+                  href={downloadUrl ?? signedUrl}
+                  download={filename ?? true}
+                  className="flex items-center gap-1 font-medium text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  <Icon name="upload" className="size-3.5 rotate-180" />
+                  Download
+                </a>
+                <a
+                  href={signedUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                >
+                  Open
+                </a>
+              </span>
             )}
           </div>
           <div className="bg-zinc-50 p-3 dark:bg-zinc-950/40">

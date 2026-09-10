@@ -2,13 +2,20 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/page-header";
 import { Badge, Card, Icon } from "@/components/ui";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import type { RecordType } from "@/lib/types";
 
 /**
- * Shared table for the Invoices and Expenses tabs. Both render the same
- * columns, filtered by `record_type`.
+ * Shared table for the Purchase Orders and Expenses tabs. Both render the
+ * same columns, filtered by `record_type`.
  */
-export async function RecordsList({ recordType }: { recordType: RecordType }) {
+export async function RecordsList({
+  recordType,
+  canManage = false,
+}: {
+  recordType: RecordType;
+  canManage?: boolean;
+}) {
   const supabase = await createClient();
 
   const { data: rows } = await supabase
@@ -61,7 +68,7 @@ export async function RecordsList({ recordType }: { recordType: RecordType }) {
               <th className="px-4 py-2.5 font-medium">Category</th>
               <th className="px-4 py-2.5 text-right font-medium">Total</th>
               <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="w-9" />
+              <th className="px-3 py-2.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -70,7 +77,7 @@ export async function RecordsList({ recordType }: { recordType: RecordType }) {
               const cell =
                 "px-4 py-2.5 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-800/40";
               return (
-                <tr key={r.id} className="group cursor-pointer">
+                <tr key={r.id} className="group">
                   <td className={`${cell} tabular-nums text-zinc-500`}>
                     <Link href={href} className="block">
                       {r.invoice_date ?? "—"}
@@ -107,10 +114,17 @@ export async function RecordsList({ recordType }: { recordType: RecordType }) {
                       <Badge tone="status">{r.status}</Badge>
                     </Link>
                   </td>
-                  <td className={`${cell} text-zinc-300`}>
-                    <Link href={href} className="block">
-                      <Icon name="chevronRight" className="size-4" />
-                    </Link>
+                  <td className="px-3 py-2 text-right group-hover:bg-zinc-50 dark:group-hover:bg-zinc-800/40">
+                    {canManage && r.status !== "exported" ? (
+                      <DeleteRecordButton
+                        recordId={r.id}
+                        srLabel={r.invoice_number ?? "record"}
+                      />
+                    ) : (
+                      <Link href={href} className="block text-zinc-300">
+                        <Icon name="chevronRight" className="size-4" />
+                      </Link>
+                    )}
                   </td>
                 </tr>
               );

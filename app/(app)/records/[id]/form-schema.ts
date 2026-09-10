@@ -1,12 +1,18 @@
 import { z } from "zod";
 import { RECORD_TYPES, TAX_TYPES } from "@/lib/types";
 
+/** public.expenses money columns are numeric(14,2). */
+const MONEY_MAX = 999_999_999_999.99;
+
 const money = z
   .union([z.number(), z.string(), z.null()])
   .transform((v) => {
     if (v === null || v === undefined || v === "") return null;
     const n = typeof v === "number" ? v : Number(String(v).replace(/[, ]/g, ""));
     return Number.isFinite(n) ? n : null;
+  })
+  .refine((n) => n === null || Math.abs(n) <= MONEY_MAX, {
+    message: "Amount is out of range.",
   });
 
 const trimmedOrNull = z

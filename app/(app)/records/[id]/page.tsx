@@ -5,6 +5,7 @@ import { requireProfile } from "@/lib/supabase/auth";
 import { createSignedDocumentUrl } from "@/lib/supabase/storage";
 import { PageHeader } from "@/components/page-header";
 import { ExportButton } from "@/components/export-button";
+import { DeleteRecordButton } from "@/components/delete-record-button";
 import { ReviewForm, type ReviewFormData } from "./review-form";
 
 export const metadata: Metadata = { title: "Review · Invoice Scanner" };
@@ -64,9 +65,17 @@ export default async function RecordReviewPage({
       : Promise.resolve({ data: null }),
   ]);
 
-  const signedUrl = document?.storage_path
-    ? await createSignedDocumentUrl(supabase, document.storage_path)
-    : null;
+  const [signedUrl, downloadUrl] = document?.storage_path
+    ? await Promise.all([
+        createSignedDocumentUrl(supabase, document.storage_path),
+        createSignedDocumentUrl(
+          supabase,
+          document.storage_path,
+          3600,
+          document.original_filename ?? true,
+        ),
+      ])
+    : [null, null];
 
   const currentVendor = expense.vendor_id
     ? ((vendors ?? []).find((v) => v.id === expense.vendor_id) ?? null)
@@ -85,6 +94,7 @@ export default async function RecordReviewPage({
       mimeType: document?.mime_type ?? null,
       filename: document?.original_filename ?? null,
       signedUrl,
+      downloadUrl,
     },
     categories: categories ?? [],
     vendors: vendors ?? [],
@@ -133,7 +143,25 @@ export default async function RecordReviewPage({
             ? "Check the details, fix anything wrong, then confirm."
             : `This record is ${expense.status}.`
         }
-        action={<ExportButton type="all" recordId={expense.id} label="Export this record" />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <ExportButton
+              type="all"
+              recordId={expense.id}
+              label="Export this record"
+            />
+            {data.canManage && expense.status !== "exported" && (
+              <DeleteRecordButton
+                recordId={expense.id}
+                label="Delete"
+                srLabel={expense.invoice_number ?? "this record"}
+                redirectTo={
+                  expense.record_type === "invoice" ? "/invoices" : "/expenses"
+                }
+              />
+            )}
+          </div>
+        }
       />
       <ReviewForm data={data} />
     </>

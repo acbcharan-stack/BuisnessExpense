@@ -5,7 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireProfile, assertRole } from "@/lib/supabase/auth";
 import { normalizeVendorName } from "@/lib/extraction/match";
+import { removeDocumentObject } from "@/lib/supabase/storage";
 import type { CustomField, ProfileRow } from "@/lib/supabase/database.types";
+
+/** Reject anything that isn't a v4-shaped UUID before it reaches the DB. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import {
   recordFormSchema,
   type RecordFormValues,
@@ -100,6 +105,9 @@ export async function saveRecord(
   expenseId: string,
   values: RecordFormValues,
 ): Promise<ActionResult> {
+  if (!UUID_RE.test(expenseId)) {
+    return { ok: false, error: "Invalid record id." };
+  }
   const profile = await requireProfile();
   const supabase = await createClient();
   const admin = createAdminClient();
@@ -250,7 +258,73 @@ export async function createManualRecord(
   return { ok: true, id: created.id };
 }
 
+export async function deleteRecord(expenseId: string): Promise<ActionResult> {
+  if (!UUID_RE.test(expenseId)) {
+    return { ok: false, error: "Invalid record id." };
+  }
+  const profile = await requireProfile();
+  try {
+    assertRole(profile, ["owner", "accountant"]);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+
+  const supabase = await createClient();
+  const admin = createAdminClient();
+
+  const { data: current } = await supabase
+    .from("expenses")
+    .select("*")
+    .eq("id", expenseId)
+    .maybeSingle();
+  if (!current) return { ok: false, error: "Record not found." };
+  if (current.status === "exported") {
+    return {
+      ok: false,
+      error: "An exported record can't be deleted — archive it instead.",
+    };
+  }
+
+  if (current.document_id) {
+    const { data: doc } = await admin
+      .from("documents")
+      .select("storage_path")
+      .eq("id", current.document_id)
+      .maybeSingle();
+    // Removing the document cascades to expenses / line items / taxes / jobs.
+    const { error } = await admin
+      .from("documents")
+      .delete()
+      .eq("id", current.document_id);
+    if (error) return { ok: false, error: error.message };
+    if (doc?.storage_path) await removeDocumentObject(admin, doc.storage_path);
+  } else {
+    const { error } = await admin
+      .from("expenses")
+      .delete()
+      .eq("id", expenseId);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  await admin.from("audit_log").insert({
+    actor_id: profile.id,
+    entity: "expense",
+    entity_id: expenseId,
+    action: "delete",
+    diff: { before: current },
+  });
+
+  revalidatePath("/invoices");
+  revalidatePath("/expenses");
+  revalidatePath("/inbox");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 export async function confirmRecord(expenseId: string): Promise<ActionResult> {
+  if (!UUID_RE.test(expenseId)) {
+    return { ok: false, error: "Invalid record id." };
+  }
   const profile = await requireProfile();
   try {
     assertRole(profile, ["owner", "accountant"]);

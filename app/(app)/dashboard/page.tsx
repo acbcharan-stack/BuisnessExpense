@@ -39,6 +39,7 @@ export default async function DashboardPage() {
     { count: invoiceCount },
     { count: expenseCount },
     { data: rows },
+    { data: valueRows },
   ] = await Promise.all([
     supabase
       .from("expenses")
@@ -59,6 +60,10 @@ export default async function DashboardPage() {
       .in("status", ["confirmed", "exported"])
       .gte("invoice_date", isoDate(fy.start))
       .lt("invoice_date", isoDate(fy.end)),
+    supabase
+      .from("expenses")
+      .select("record_type, amount_inr, total, currency")
+      .in("status", ["confirmed", "exported"]),
   ]);
 
   for (const r of rows ?? []) {
@@ -71,6 +76,16 @@ export default async function DashboardPage() {
   }
   const fyTotal = quarters.reduce((s, q) => s + q.total, 0);
   const qMax = Math.max(1, ...quarters.map((q) => q.total));
+
+  // All-time confirmed spend value, split by type (for the tile sub-lines).
+  let poValue = 0;
+  let expValue = 0;
+  for (const r of valueRows ?? []) {
+    const amt = r.amount_inr ?? (r.currency === "INR" ? r.total : null);
+    if (amt == null) continue;
+    if (r.record_type === "invoice") poValue += Number(amt);
+    else expValue += Number(amt);
+  }
 
   return (
     <>
@@ -102,8 +117,14 @@ export default async function DashboardPage() {
           icon="invoice"
           label="Purchase orders"
           value={invoiceCount ?? 0}
+          sub={`${inr(poValue)} confirmed`}
         />
-        <Stat icon="expense" label="Expenses" value={expenseCount ?? 0} />
+        <Stat
+          icon="expense"
+          label="Expenses"
+          value={expenseCount ?? 0}
+          sub={`${inr(expValue)} confirmed`}
+        />
       </div>
 
       <section className="mt-8">
@@ -168,10 +189,12 @@ function Stat({
   icon,
   label,
   value,
+  sub,
 }: {
   icon: string;
   label: string;
   value: number | string;
+  sub?: string;
 }) {
   return (
     <Card className="p-4">
@@ -180,6 +203,9 @@ function Stat({
         <p className="text-xs uppercase tracking-wide text-zinc-500">{label}</p>
       </div>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      {sub ? (
+        <p className="mt-0.5 text-xs tabular-nums text-zinc-400">{sub}</p>
+      ) : null}
     </Card>
   );
 }

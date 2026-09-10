@@ -26,7 +26,12 @@ export default async function NewRecordPage() {
     canManage: profile.role === "owner" || profile.role === "accountant",
     manual: true,
     mode: "create",
-    document: { mimeType: null, filename: null, signedUrl: null },
+    document: {
+      mimeType: null,
+      filename: null,
+      signedUrl: null,
+      downloadUrl: null,
+    },
     categories: categories ?? [],
     vendors: vendors ?? [],
     confidence: null,

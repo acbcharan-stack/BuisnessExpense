@@ -40,7 +40,17 @@ export async function GET(request: Request) {
   }
 
   const params = new URL(request.url).searchParams;
-  const singleId = params.get("id");
+  const idParam = params.get("id");
+  const singleId =
+    idParam &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      idParam,
+    )
+      ? idParam
+      : null;
+  if (idParam && !singleId) {
+    return NextResponse.json({ error: "Invalid record id." }, { status: 400 });
+  }
   const typeParam = params.get("type");
   const recordType =
     typeParam === "invoice" || typeParam === "expense" ? typeParam : null;
