@@ -39,6 +39,7 @@ export function BusinessTabs({
           <Link
             key={it.value || "all"}
             href={href(it.value)}
+            prefetch
             aria-current={active ? "page" : undefined}
             className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition active:scale-[.97] ${
               active

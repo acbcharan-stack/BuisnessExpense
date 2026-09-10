@@ -3,42 +3,75 @@ import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/page-header";
 import { Badge, Card, Icon } from "@/components/ui";
 import { DeleteRecordButton } from "@/components/delete-record-button";
+import { ListPager } from "@/components/list-pager";
 import { isUuid } from "@/lib/uuid";
+import {
+  RECORDS_PAGE_SIZE,
+  pageCountFor,
+  parsePageParam,
+} from "@/lib/pagination";
 import type { RecordType } from "@/lib/types";
 
 /**
  * Shared table for the Purchase Orders and Expenses tabs. Both render the
  * same columns, filtered by `record_type` and (optionally) by business.
  * `businessFilter` is the raw `?business=` param: a business id, "unassigned",
- * or empty for all.
+ * or empty for all. `pageParam` is the raw `?page=` param — validated here, not
+ * trusted.
  */
 export async function RecordsList({
   recordType,
   canManage = false,
   businessFilter = "",
+  pageParam,
 }: {
   recordType: RecordType;
   canManage?: boolean;
   businessFilter?: string;
+  pageParam?: string | string[];
 }) {
   const supabase = await createClient();
+
+  const page = parsePageParam(pageParam);
+  const from = (page - 1) * RECORDS_PAGE_SIZE;
+  const to = from + RECORDS_PAGE_SIZE - 1;
 
   let query = supabase
     .from("expenses")
     .select(
       "id, invoice_number, invoice_date, total, currency, status, vendor_id, category_id, business_id",
+      { count: "exact" },
     )
     .eq("record_type", recordType)
+    // `created_at` is the tiebreaker so rows can't shuffle between pages when
+    // several share an invoice date (or have none).
     .order("invoice_date", { ascending: false, nullsFirst: false })
-    .limit(100);
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   if (businessFilter === "unassigned") query = query.is("business_id", null);
   else if (isUuid(businessFilter))
     query = query.eq("business_id", businessFilter);
 
-  const { data: rows } = await query;
+  const { data: rows, count } = await query;
+
+  const total = count ?? 0;
+  const pageCount = pageCountFor(total);
 
   if (!rows || rows.length === 0) {
+    // Page 1 empty = genuinely nothing here. A higher page landing empty means
+    // the data shrank under the visitor's feet — show a way back, not "no data".
+    if (page > 1) {
+      return (
+        <>
+          <Card className="p-6 text-center text-sm text-zinc-500">
+            Nothing on page {page} — the list may have got shorter. Step back
+            with Prev.
+          </Card>
+          <ListPager page={page} pageCount={pageCount} total={total} />
+        </>
+      );
+    }
     return (
       <EmptyState icon={recordType === "invoice" ? "invoice" : "expense"}>
         No {recordType === "invoice" ? "purchase orders" : "expenses"} here yet.
@@ -72,7 +105,7 @@ export async function RecordsList({
   const categoryName = new Map((categories ?? []).map((c) => [c.id, c.name]));
   const businessName = new Map((businesses ?? []).map((b) => [b.id, b.name]));
 
-  return (
+  const table = (
     <Card className="overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -159,5 +192,12 @@ export async function RecordsList({
         </table>
       </div>
     </Card>
+  );
+
+  return (
+    <>
+      {table}
+      <ListPager page={page} pageCount={pageCount} total={total} />
+    </>
   );
 }

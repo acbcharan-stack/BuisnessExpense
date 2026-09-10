@@ -13,9 +13,9 @@ export const dynamic = "force-dynamic";
 export default async function ExpensesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ business?: string }>;
+  searchParams: Promise<{ business?: string; page?: string }>;
 }) {
-  const [{ business }, profile, supabase] = await Promise.all([
+  const [{ business, page }, profile, supabase] = await Promise.all([
     searchParams,
     requireProfile(),
     createClient(),
@@ -45,6 +45,7 @@ export default async function ExpensesPage({
         recordType="expense"
         canManage={canManage}
         businessFilter={business ?? ""}
+        pageParam={page}
       />
     </>
   );
