@@ -2,8 +2,9 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { LoginForm } from "./login-form";
 import { Icon } from "@/components/ui";
+import { APP_NAME } from "@/lib/constants";
 
-export const metadata: Metadata = { title: "Sign in · Invoice Scanner" };
+export const metadata: Metadata = { title: `Sign in · ${APP_NAME}` };
 
 export default async function LoginPage({
   searchParams,
@@ -19,9 +20,7 @@ export default async function LoginPage({
           <span className="mb-3 grid size-12 place-items-center rounded-2xl bg-blue-600 text-white shadow-sm dark:bg-blue-500">
             <Icon name="invoice" className="size-6" />
           </span>
-          <h1 className="text-xl font-semibold tracking-tight">
-            Invoice&nbsp;Scanner
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">{APP_NAME}</h1>
           <p className="mt-1 text-sm text-zinc-500">
             Sign in to capture and review expenses.
           </p>

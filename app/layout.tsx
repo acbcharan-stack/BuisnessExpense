@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { APP_NAME } from "@/lib/constants";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,12 +15,12 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Invoice Scanner",
+    default: APP_NAME,
     template: "%s",
   },
   description:
     "Capture, extract and review business invoices and expenses for a CNC / precision engineering shop.",
-  applicationName: "Invoice Scanner",
+  applicationName: APP_NAME,
 };
 
 export const viewport: Viewport = {

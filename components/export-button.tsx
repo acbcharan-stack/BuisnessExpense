@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui";
+import { APP_SLUG } from "@/lib/constants";
 
 /**
  * Downloads the .xlsx export from /api/export. Uses fetch (not a plain
@@ -39,8 +40,7 @@ export function ExportButton({
       const blob = await res.blob();
       const cd = res.headers.get("Content-Disposition") ?? "";
       const name =
-        /filename="?([^"]+)"?/.exec(cd)?.[1] ??
-        `invoice-scanner-${type}.xlsx`;
+        /filename="?([^"]+)"?/.exec(cd)?.[1] ?? `${APP_SLUG}-${type}.xlsx`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

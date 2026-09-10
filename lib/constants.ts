@@ -28,6 +28,11 @@ export const SEED_CATEGORIES: {
   { name: "Misc", zohoAccount: "Other Expenses", defaultRecordType: "expense" },
 ];
 
+/** Product name shown in the UI, page titles and export metadata. */
+export const APP_NAME = "Business";
+/** Lower-case, filename-safe form of APP_NAME (used for export file names). */
+export const APP_SLUG = "business";
+
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB per file
 export const MAX_PDF_PAGES = 30;
 export const ACCEPTED_MIME_TYPES = [

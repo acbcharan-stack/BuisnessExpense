@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/supabase/auth";
 import { PageHeader } from "@/components/page-header";
 import { Badge, Card } from "@/components/ui";
+import { APP_NAME } from "@/lib/constants";
 
-export const metadata: Metadata = { title: "Settings · Invoice Scanner" };
+export const metadata: Metadata = { title: `Settings · ${APP_NAME}` };
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {

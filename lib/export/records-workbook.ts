@@ -2,6 +2,7 @@ import "server-only";
 
 import ExcelJS from "exceljs";
 import { RECORD_TYPE_LABELS } from "@/lib/types";
+import { APP_NAME } from "@/lib/constants";
 import type {
   CategoryRow,
   ExpenseRow,
@@ -51,7 +52,7 @@ export async function buildRecordsWorkbook(
   const expenseById = new Map(input.expenses.map((e) => [e.id, e]));
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Invoice Scanner";
+  wb.creator = APP_NAME;
   wb.created = new Date();
 
   /* ---- Sheet 1: Records (one row per invoice / expense) ---------------- */

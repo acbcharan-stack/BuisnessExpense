@@ -1,5 +1,6 @@
 import { requireProfile } from "@/lib/supabase/auth";
 import { AppNav } from "@/components/app-nav";
+import { APP_NAME } from "@/lib/constants";
 
 export default async function AppLayout({
   children,
@@ -16,8 +17,7 @@ export default async function AppLayout({
           {children}
         </main>
         <footer className="border-t border-zinc-200 px-4 py-4 text-center text-xs text-zinc-400 dark:border-zinc-800 sm:px-6">
-          Invoice Scanner · signed in as {profile.full_name || "you"} (
-          {profile.role})
+          {APP_NAME} · signed in as {profile.full_name || "you"} ({profile.role})
         </footer>
       </div>
     </div>

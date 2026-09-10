@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/app/(auth)/login/actions";
 import { Icon, SubmitButton } from "@/components/ui";
+import { APP_NAME } from "@/lib/constants";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
@@ -19,14 +20,12 @@ function Brand() {
     <Link
       href="/dashboard"
       className="flex items-center gap-2"
-      aria-label="Invoice Scanner home"
+      aria-label={`${APP_NAME} home`}
     >
       <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-blue-600 text-white dark:bg-blue-500">
         <Icon name="invoice" className="size-4" />
       </span>
-      <span className="text-sm font-semibold tracking-tight">
-        Invoice&nbsp;Scanner
-      </span>
+      <span className="text-sm font-semibold tracking-tight">{APP_NAME}</span>
     </Link>
   );
 }

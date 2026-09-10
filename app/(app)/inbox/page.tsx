@@ -4,10 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { Badge, Card, Icon } from "@/components/ui";
 import { RECORD_TYPE_LABELS_SHORT } from "@/lib/types";
+import { APP_NAME } from "@/lib/constants";
 import { UploadDropzone } from "./upload-dropzone";
 import { RetryButton } from "./retry-button";
 
-export const metadata: Metadata = { title: "Inbox · Invoice Scanner" };
+export const metadata: Metadata = { title: `Inbox · ${APP_NAME}` };
 export const dynamic = "force-dynamic";
 
 function timeAgo(iso: string): string {

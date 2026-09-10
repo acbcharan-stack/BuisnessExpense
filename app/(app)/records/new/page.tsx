@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/supabase/auth";
 import { PageHeader } from "@/components/page-header";
+import { APP_NAME } from "@/lib/constants";
 import { ReviewForm, type ReviewFormData } from "../[id]/review-form";
 
-export const metadata: Metadata = { title: "New record · Invoice Scanner" };
+export const metadata: Metadata = { title: `New record · ${APP_NAME}` };
 export const dynamic = "force-dynamic";
 
 export default async function NewRecordPage() {

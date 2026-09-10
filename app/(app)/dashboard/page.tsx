@@ -3,9 +3,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { Card, Icon } from "@/components/ui";
+import { APP_NAME } from "@/lib/constants";
 import { financialYearOf } from "@/lib/tax/fy";
 
-export const metadata: Metadata = { title: "Dashboard · Invoice Scanner" };
+export const metadata: Metadata = { title: `Dashboard · ${APP_NAME}` };
 export const dynamic = "force-dynamic";
 
 const MONTH = (d: Date) => d.toLocaleDateString("en-IN", { month: "short" });

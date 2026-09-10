@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { requireProfile } from "@/lib/supabase/auth";
 import { PageHeader } from "@/components/page-header";
 import { ExportButton } from "@/components/export-button";
+import { APP_NAME } from "@/lib/constants";
 import { RecordsList } from "../records-list";
 
 export const metadata: Metadata = {
-  title: "Purchase Orders · Invoice Scanner",
+  title: `Purchase Orders · ${APP_NAME}`,
 };
 export const dynamic = "force-dynamic";
 
