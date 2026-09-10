@@ -39,7 +39,7 @@ export function getServerEnv() {
   return {
     supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
     geminiApiKey: required("GEMINI_API_KEY"),
-    geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+    geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.6-flash",
     inboundEmailSecret: process.env.INBOUND_EMAIL_SECRET ?? "",
     inboundEmailAllowlist: (process.env.INBOUND_EMAIL_ALLOWLIST ?? "")
       .split(",")

@@ -8,7 +8,7 @@ export const SEED_CATEGORIES: {
   zohoAccount: string;
   defaultRecordType: "invoice" | "expense";
 }[] = [
-  { name: "Raw Material – Metal/Bar Stock", zohoAccount: "Cost of Goods Sold", defaultRecordType: "invoice" },
+  { name: "Raw Material - Metal/Bar Stock", zohoAccount: "Cost of Goods Sold", defaultRecordType: "invoice" },
   { name: "Tooling & Inserts", zohoAccount: "Consumables", defaultRecordType: "invoice" },
   { name: "Cutting Fluid/Coolant", zohoAccount: "Consumables", defaultRecordType: "invoice" },
   { name: "Consumables", zohoAccount: "Consumables", defaultRecordType: "invoice" },

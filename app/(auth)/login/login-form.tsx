@@ -10,15 +10,19 @@ import {
 
 const initial: AuthActionState = {};
 
-function SubmitButton({ label }: { label: string }) {
+const fieldCls =
+  "w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2.5 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700";
+
+function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: string }) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:opacity-60 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+      suppressHydrationWarning
+      className="w-full rounded-md bg-zinc-900 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:opacity-60 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
     >
-      {pending ? "…" : label}
+      {pending ? pendingLabel : label}
     </button>
   );
 }
@@ -39,9 +43,14 @@ export function LoginForm({ next }: { next: string }) {
             id="email"
             name="email"
             type="email"
+            inputMode="email"
             autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
-            className="w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700"
+            suppressHydrationWarning
+            className={fieldCls}
           />
         </div>
         <div className="space-y-1">
@@ -54,7 +63,8 @@ export function LoginForm({ next }: { next: string }) {
             type="password"
             autoComplete="current-password"
             required
-            className="w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700"
+            suppressHydrationWarning
+            className={fieldCls}
           />
         </div>
 
@@ -64,7 +74,7 @@ export function LoginForm({ next }: { next: string }) {
           </p>
         ) : null}
 
-        <SubmitButton label="Sign in" />
+        <SubmitButton label="Sign in" pendingLabel="Signing in…" />
       </form>
 
       <form action={resetAction} className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
@@ -75,11 +85,18 @@ export function LoginForm({ next }: { next: string }) {
         <input
           name="email"
           type="email"
+          inputMode="email"
+          autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           placeholder="you@example.com"
-          className="mt-2 w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700"
+          suppressHydrationWarning
+          className={`mt-2 ${fieldCls}`}
         />
         <button
           type="submit"
+          suppressHydrationWarning
           className="mt-2 text-sm font-medium text-zinc-600 underline underline-offset-4 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
         >
           Send reset link

@@ -342,7 +342,7 @@ create policy "documents bucket delete" on storage.objects
 -- Seed: categories for a CNC / precision engineering shop
 -- =============================================================================
 insert into public.categories (name, zoho_account_name, default_record_type) values
-  ('Raw Material – Metal/Bar Stock', 'Cost of Goods Sold',        'invoice'),
+  ('Raw Material - Metal/Bar Stock', 'Cost of Goods Sold',        'invoice'),
   ('Tooling & Inserts',              'Consumables',                'invoice'),
   ('Cutting Fluid/Coolant',          'Consumables',                'invoice'),
   ('Consumables',                    'Consumables',                'invoice'),
