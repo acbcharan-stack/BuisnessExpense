@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const profile = await requireProfile();
-  const canManage = profile.role === "owner" || profile.role === "accountant";
+  // Roles were flattened in migration 0004 — everyone has full access.
+  const canManage = true;
   const supabase = await createClient();
 
   const [{ data: categories }, { data: team }, { data: businesses }] =
@@ -61,13 +62,14 @@ export default async function SettingsPage() {
               className="flex items-center justify-between px-4 py-2.5"
             >
               <span className="font-medium">{m.full_name || "(no name)"}</span>
-              <Badge>{m.role}</Badge>
+              <Badge>Level {m.role}</Badge>
             </div>
           ))}
         </Card>
         <p className="mt-2 text-xs text-zinc-500">
-          Accounts are created in the Supabase dashboard; roles are changed via
-          SQL. You are signed in as <strong className="capitalize">{profile.role}</strong>.
+          Accounts are created in the Supabase dashboard. Every user has full
+          access; the level (1&ndash;4) is just a label and is set in SQL. You
+          are signed in as <strong>Level {profile.role}</strong>.
         </p>
       </section>
 

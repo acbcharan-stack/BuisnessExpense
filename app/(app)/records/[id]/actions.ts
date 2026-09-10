@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireProfile, assertRole } from "@/lib/supabase/auth";
+import { requireProfile } from "@/lib/supabase/auth";
 import { normalizeVendorName } from "@/lib/extraction/match";
 import { removeDocumentObject } from "@/lib/supabase/storage";
 import { UUID_RE } from "@/lib/uuid";
@@ -136,18 +136,10 @@ export async function saveRecord(
     .maybeSingle();
   if (!current) return { ok: false, error: "Record not found." };
 
-  // A record in `review` is editable by any writer. A `confirmed` record can
-  // still be corrected, but only by a manager (owner / accountant). `exported`
-  // and `archived` are locked.
+  // `review` and `confirmed` records are editable by any signed-in user;
+  // `exported` and `archived` are locked.
   if (current.status === "exported" || current.status === "archived") {
     return { ok: false, error: `A ${current.status} record can't be edited.` };
-  }
-  if (current.status === "confirmed") {
-    try {
-      assertRole(profile, ["owner", "accountant"]);
-    } catch (e) {
-      return { ok: false, error: (e as Error).message };
-    }
   }
 
   const categoryId = await resolveCategoryId(admin, v);
@@ -205,11 +197,6 @@ export async function createManualRecord(
   values: RecordFormValues,
 ): Promise<ActionResult> {
   const profile = await requireProfile();
-  try {
-    assertRole(profile, ["owner", "accountant", "staff"]);
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
 
   const parsed = recordFormSchema.safeParse(values);
   if (!parsed.success) {
@@ -278,11 +265,6 @@ export async function deleteRecord(expenseId: string): Promise<ActionResult> {
     return { ok: false, error: "Invalid record id." };
   }
   const profile = await requireProfile();
-  try {
-    assertRole(profile, ["owner", "accountant"]);
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
 
   const supabase = await createClient();
   const admin = createAdminClient();
@@ -341,11 +323,6 @@ export async function confirmRecord(expenseId: string): Promise<ActionResult> {
     return { ok: false, error: "Invalid record id." };
   }
   const profile = await requireProfile();
-  try {
-    assertRole(profile, ["owner", "accountant"]);
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
 
   const supabase = await createClient();
   const { data: current } = await supabase

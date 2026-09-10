@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: `New record · ${APP_NAME}` };
 export const dynamic = "force-dynamic";
 
 export default async function NewRecordPage() {
-  const profile = await requireProfile();
+  await requireProfile();
   const supabase = await createClient();
 
   const [{ data: categories }, { data: businesses }, { data: vendors }] =
@@ -30,7 +30,7 @@ export default async function NewRecordPage() {
   const data: ReviewFormData = {
     expenseId: "",
     status: "",
-    canManage: profile.role === "owner" || profile.role === "accountant",
+    canManage: true,
     manual: true,
     mode: "create",
     document: {

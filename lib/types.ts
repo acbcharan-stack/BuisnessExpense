@@ -1,7 +1,13 @@
 /** Shared domain enums & types. Keep in sync with supabase/migrations. */
 
-export const USER_ROLES = ["owner", "accountant", "staff"] as const;
-export type UserRole = (typeof USER_ROLES)[number];
+/**
+ * Access level, 1-4. Every signed-in user has full access; the number is an
+ * organisational label only (migration 0004 flattened the old
+ * owner/accountant/staff roles). Kept as a range so it can regain meaning later
+ * without another type migration.
+ */
+export const ROLE_LEVELS = [1, 2, 3, 4] as const;
+export type RoleLevel = (typeof ROLE_LEVELS)[number];
 
 /** Top-level split that drives the two tabs in the UI. */
 export const RECORD_TYPES = ["invoice", "expense"] as const;
@@ -66,11 +72,3 @@ export const TAX_TYPES = [
   "OTHER",
 ] as const;
 export type TaxType = (typeof TAX_TYPES)[number];
-
-export function canConfirmAndExport(role: UserRole): boolean {
-  return role === "owner" || role === "accountant";
-}
-
-export function canDelete(role: UserRole): boolean {
-  return role === "owner" || role === "accountant";
-}

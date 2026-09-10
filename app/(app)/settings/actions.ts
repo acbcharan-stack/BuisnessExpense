@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireProfile, assertRole } from "@/lib/supabase/auth";
+import { requireProfile } from "@/lib/supabase/auth";
 import { UUID_RE } from "@/lib/uuid";
 
 export interface ActionResult {
@@ -24,14 +24,9 @@ const clean = (v: string | undefined) => {
   return t === "" ? null : t;
 };
 
-/** Create or update a business. Owner / accountant only. */
+/** Create or update a business. Any signed-in user. */
 export async function saveBusiness(input: BusinessInput): Promise<ActionResult> {
-  const profile = await requireProfile();
-  try {
-    assertRole(profile, ["owner", "accountant"]);
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
+  await requireProfile();
 
   const name = (input.name ?? "").trim();
   if (!name) return { ok: false, error: "Name is required." };

@@ -12,7 +12,8 @@
  *     > lib/supabase/database.types.ts
  */
 
-export type UserRoleDb = "owner" | "accountant" | "staff";
+/** Access level 1-4 (migration 0004). A label only — no permission effect. */
+export type UserRoleDb = number;
 export type RecordTypeDb = "invoice" | "expense";
 export type ExpenseTypeDb =
   | "invoice"

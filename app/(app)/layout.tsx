@@ -17,7 +17,8 @@ export default async function AppLayout({
           {children}
         </main>
         <footer className="border-t border-zinc-200 px-4 py-4 text-center text-xs text-zinc-400 dark:border-zinc-800 sm:px-6">
-          {APP_NAME} · signed in as {profile.full_name || "you"} ({profile.role})
+          {APP_NAME} · signed in as {profile.full_name || "you"} (level{" "}
+          {profile.role})
         </footer>
       </div>
     </div>

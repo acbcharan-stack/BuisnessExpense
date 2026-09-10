@@ -53,16 +53,19 @@ npm install
    npx supabase db push
    ```
 
-### 3. Create the three user accounts
+### 3. Create the user accounts
 
 In the Supabase dashboard → Authentication → Users → **Add user** (email +
-password, "Auto Confirm"). Do this three times. A `profiles` row is created
-automatically for each. Then promote yourself in the SQL editor:
+password, "Auto Confirm"), once per person. A `profiles` row is created
+automatically for each, at access **level 1**.
+
+Every signed-in user has full access (upload, edit, confirm, export, delete,
+settings). `profiles.role` is a 1&ndash;4 label only — set it in the SQL editor
+if you want to record a tier:
 
 ```sql
-update public.profiles set role = 'owner',      full_name = 'Your Name'   where id = '<your-uuid>';
-update public.profiles set role = 'accountant',  full_name = 'Accountant'  where id = '<uuid-2>';
-update public.profiles set role = 'staff',       full_name = 'Staff'       where id = '<uuid-3>';
+update public.profiles set full_name = 'Your Name', role = 1 where id = '<your-uuid>';
+update public.profiles set full_name = 'Colleague', role = 2 where id = '<uuid-2>';
 ```
 
 ### 4. Gemini key

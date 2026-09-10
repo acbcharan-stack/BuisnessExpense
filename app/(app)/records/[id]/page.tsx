@@ -18,7 +18,7 @@ export default async function RecordReviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const profile = await requireProfile();
+  await requireProfile();
   const supabase = await createClient();
 
   const { data: expense } = await supabase
@@ -95,7 +95,7 @@ export default async function RecordReviewPage({
   const data: ReviewFormData = {
     expenseId: expense.id,
     status: expense.status,
-    canManage: profile.role === "owner" || profile.role === "accountant",
+    canManage: true,
     manual: !expense.document_id,
     document: {
       mimeType: document?.mime_type ?? null,

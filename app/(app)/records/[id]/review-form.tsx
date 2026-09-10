@@ -971,10 +971,7 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
 
         {locked && (
           <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
-            This record is {data.status}
-            {data.status === "confirmed"
-              ? " — ask an owner or accountant to change it."
-              : " and can no longer be edited."}
+            This record is {data.status} and can no longer be edited.
           </p>
         )}
 

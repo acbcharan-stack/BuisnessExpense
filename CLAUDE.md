@@ -18,8 +18,9 @@ India**. Next.js 16 (App Router) on Vercel · Supabase (Postgres + Auth + Storag
   aliases (not `interface` — the query builder needs `Record<string, unknown>`
   compatibility). Regenerate with `supabase gen types` once the project is linked.
 - **Env** goes through `lib/env.ts` (`publicEnv` getters, `getServerEnv()`).
-- **Roles**: `owner`, `accountant`, `staff` on `public.profiles`. `can_write()` =
-  any of the three; `can_manage()` = owner/accountant (confirm / export / delete).
+- **Access**: flat since migration 0004 — every signed-in user (any `profiles`
+  row) can do everything. `can_write()` = `can_manage()` = "has a profile".
+  `profiles.role` is a `smallint` 1–4 label with no permission effect.
 - **Two tabs** come from `expenses.record_type` (`invoice` vs `expense`).
 - Tests: Vitest, files `*.test.ts` next to source.
 

@@ -22,13 +22,14 @@ export default async function InvoicesPage({
   searchParams: Promise<SearchParams>;
 }) {
   const supabase = await createClient();
-  const [sp, profile, { businesses, categories, vendors, countries }] =
+  const [sp, , { businesses, categories, vendors, countries }] =
     await Promise.all([
       searchParams,
       requireProfile(),
       loadRecordListChrome(supabase, "invoice"),
     ]);
-  const canManage = profile.role === "owner" || profile.role === "accountant";
+  // Every signed-in user has full access (roles were flattened in 0004).
+  const canManage = true;
 
   const business = typeof sp.business === "string" ? sp.business : "";
   const page = typeof sp.page === "string" ? sp.page : undefined;

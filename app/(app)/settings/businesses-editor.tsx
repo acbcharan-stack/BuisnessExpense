@@ -164,7 +164,7 @@ export function BusinessesEditor({
           </div>
         ))}
         <p className="px-4 py-2 text-xs text-zinc-400">
-          Only an owner or accountant can edit businesses.
+          Sign in to edit businesses.
         </p>
       </Card>
     );

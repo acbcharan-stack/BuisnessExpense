@@ -2,7 +2,6 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { ProfileRow } from "@/lib/supabase/database.types";
-import type { UserRole } from "@/lib/types";
 
 /**
  * Returns the signed-in auth user, or null.
@@ -42,12 +41,3 @@ export const requireProfile = cache(async (): Promise<ProfileRow> => {
   }
   return profile;
 });
-
-export function assertRole(
-  profile: Pick<ProfileRow, "role">,
-  allowed: UserRole[],
-): void {
-  if (!allowed.includes(profile.role)) {
-    throw new Error("You do not have permission to perform this action.");
-  }
-}

@@ -63,14 +63,14 @@ function NavLinks({
   );
 }
 
-function UserFooter({ name, role }: { name: string; role: string }) {
+function UserFooter({ name, role }: { name: string; role: number }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="min-w-0 text-xs leading-tight">
         <span className="block truncate font-medium text-zinc-700 dark:text-zinc-300">
           {name}
         </span>
-        <span className="capitalize text-zinc-500">{role}</span>
+        <span className="text-zinc-500">Level {role}</span>
       </span>
       <form action={signOut}>
         <SubmitButton size="sm" variant="secondary" idleIcon="logout">
@@ -81,7 +81,7 @@ function UserFooter({ name, role }: { name: string; role: string }) {
   );
 }
 
-export function AppNav({ name, role }: { name: string; role: string }) {
+export function AppNav({ name, role }: { name: string; role: number }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);

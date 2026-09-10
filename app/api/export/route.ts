@@ -64,25 +64,6 @@ export async function GET(request: Request) {
   // I'm looking at". Ignored for a single-record export.
   const filters = parseRecordFilters(Object.fromEntries(params));
 
-  // Bulk export is manager-only; a single record can be exported by anyone
-  // who can already open it.
-  if (!singleId) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (
-      !profile ||
-      (profile.role !== "owner" && profile.role !== "accountant")
-    ) {
-      return NextResponse.json(
-        { error: "Only an owner or accountant can export all records." },
-        { status: 403 },
-      );
-    }
-  }
-
   const admin = createAdminClient();
 
   let query = admin

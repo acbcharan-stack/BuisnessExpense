@@ -6,9 +6,8 @@ import { Button, Icon } from "@/components/ui";
 import { deleteRecord } from "@/app/(app)/records/[id]/actions";
 
 /**
- * Deletes one record after an explicit "permanent" confirm. Shown only where
- * the caller has already checked the viewer is an owner/accountant — the
- * server action re-checks the role and the id regardless.
+ * Deletes one record after an explicit "permanent" confirm. The server action
+ * re-checks the signed-in user and the id regardless.
  */
 export function DeleteRecordButton({
   recordId,
