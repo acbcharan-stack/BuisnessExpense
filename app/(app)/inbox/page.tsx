@@ -2,11 +2,22 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
+import { Badge, Card, Icon } from "@/components/ui";
 import { UploadDropzone } from "./upload-dropzone";
 import { RetryButton } from "./retry-button";
 
 export const metadata: Metadata = { title: "Inbox · Invoice Scanner" };
 export const dynamic = "force-dynamic";
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 export default async function InboxPage() {
   const supabase = await createClient();
@@ -29,78 +40,88 @@ export default async function InboxPage() {
     <>
       <PageHeader
         title="Inbox"
-        description="Upload documents, then review what Gemini extracted."
+        description="Upload documents, then review what the AI extracted."
       />
 
       <UploadDropzone />
 
       <section className="mt-8">
-        <h2 className="mb-2 text-sm font-semibold">
-          Needs review{" "}
-          <span className="text-zinc-400">({toReview?.length ?? 0})</span>
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+          <Icon name="clock" className="size-4 text-zinc-400" />
+          Needs review
+          <span className="rounded-full bg-zinc-200 px-1.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            {toReview?.length ?? 0}
+          </span>
         </h2>
         {!toReview || toReview.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900">
+          <Card className="p-4 text-sm text-zinc-500">
             Nothing waiting. Uploaded documents show up here once extracted.
-          </p>
+          </Card>
         ) : (
-          <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+          <Card className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {toReview.map((e) => (
-              <li key={e.id}>
-                <Link
-                  href={`/records/${e.id}`}
-                  className="flex items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                >
-                  <span>
-                    <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-medium uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                      {e.record_type}
-                    </span>{" "}
+              <Link
+                key={e.id}
+                href={`/records/${e.id}`}
+                className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition first:rounded-t-xl last:rounded-b-xl hover:bg-zinc-50 active:scale-[.995] dark:hover:bg-zinc-800/50"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <Badge>{e.record_type}</Badge>
+                  <span className="truncate">
                     {e.invoice_number ?? "(no number)"}
                   </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-3">
                   <span className="tabular-nums text-zinc-500">
                     {e.total != null
                       ? `${e.currency} ${Number(e.total).toLocaleString("en-IN")}`
                       : "—"}
                   </span>
-                </Link>
-              </li>
+                  <Icon name="chevronRight" className="size-4 text-zinc-300" />
+                </span>
+              </Link>
             ))}
-          </ul>
+          </Card>
         )}
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-2 text-sm font-semibold">Recent uploads</h2>
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+          <Icon name="file" className="size-4 text-zinc-400" />
+          Recent uploads
+        </h2>
         {!documents || documents.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-zinc-300 bg-white p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900">
-            No uploads yet.
-          </p>
+          <Card className="p-4 text-sm text-zinc-500">No uploads yet.</Card>
         ) : (
-          <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+          <Card className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {documents.map((d) => (
-              <li
+              <div
                 key={d.id}
                 className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
               >
-                <span className="min-w-0 truncate">
-                  {d.original_filename ?? d.id}
+                <span className="min-w-0">
+                  <span className="block truncate">
+                    {d.original_filename ?? d.id}
+                  </span>
                   {d.status === "failed" && d.error ? (
                     <span className="block truncate text-xs text-red-600">
                       {d.error}
                     </span>
-                  ) : null}
+                  ) : (
+                    <span className="text-xs text-zinc-400">
+                      {d.source} · {timeAgo(d.created_at)}
+                    </span>
+                  )}
                 </span>
-                <span className="flex shrink-0 items-center gap-3 text-xs text-zinc-500">
-                  <span>
-                    {d.source} · {d.status}
-                  </span>
+                <span className="flex shrink-0 items-center gap-3">
+                  <Badge tone="status">{d.status}</Badge>
                   {(d.status === "failed" || d.status === "uploaded") && (
                     <RetryButton documentId={d.id} />
                   )}
                 </span>
-              </li>
+              </div>
             ))}
-          </ul>
+          </Card>
         )}
       </section>
     </>

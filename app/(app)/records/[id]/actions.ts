@@ -32,8 +32,19 @@ export async function saveRecord(
     .eq("id", expenseId)
     .maybeSingle();
   if (!current) return { ok: false, error: "Record not found." };
-  if (current.status !== "review") {
-    return { ok: false, error: "Only records in review can be edited." };
+
+  // A record in `review` is editable by any writer. A `confirmed` record can
+  // still be corrected, but only by a manager (owner / accountant). `exported`
+  // and `archived` are locked.
+  if (current.status === "exported" || current.status === "archived") {
+    return { ok: false, error: `A ${current.status} record can't be edited.` };
+  }
+  if (current.status === "confirmed") {
+    try {
+      assertRole(profile, ["owner", "accountant"]);
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
   }
 
   // Category: create a new one on the fly if the user typed a name.

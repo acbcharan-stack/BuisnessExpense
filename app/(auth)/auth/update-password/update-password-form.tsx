@@ -3,6 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Button, Card } from "@/components/ui";
+
+const fieldCls =
+  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-950";
 
 export function UpdatePasswordForm() {
   const router = useRouter();
@@ -35,44 +39,45 @@ export function UpdatePasswordForm() {
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="space-y-4 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-    >
-      <div className="space-y-1">
-        <label htmlFor="password" className="text-sm font-medium">
-          New password
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          required
-          className="w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700"
-        />
-      </div>
-      <div className="space-y-1">
-        <label htmlFor="confirm" className="text-sm font-medium">
-          Confirm password
-        </label>
-        <input
-          id="confirm"
-          name="confirm"
-          type="password"
-          autoComplete="new-password"
-          required
-          className="w-full rounded-md border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700"
-        />
-      </div>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-white dark:text-zinc-900"
-      >
-        {pending ? "Saving…" : "Save password"}
-      </button>
-    </form>
+    <Card className="p-6">
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="space-y-1">
+          <label htmlFor="password" className="text-sm font-medium">
+            New password
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            required
+            suppressHydrationWarning
+            className={fieldCls}
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="confirm" className="text-sm font-medium">
+            Confirm password
+          </label>
+          <input
+            id="confirm"
+            name="confirm"
+            type="password"
+            autoComplete="new-password"
+            required
+            suppressHydrationWarning
+            className={fieldCls}
+          />
+        </div>
+        {error ? (
+          <p className="text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <Button type="submit" variant="primary" block loading={pending}>
+          Save password
+        </Button>
+      </form>
+    </Card>
   );
 }

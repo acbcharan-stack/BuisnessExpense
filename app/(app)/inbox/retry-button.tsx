@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui";
 
 export function RetryButton({ documentId }: { documentId: string }) {
   const router = useRouter();
@@ -26,14 +27,15 @@ export function RetryButton({ documentId }: { documentId: string }) {
   return (
     <span className="flex items-center gap-2">
       {error && <span className="text-xs text-red-600">{error}</span>}
-      <button
-        type="button"
+      <Button
+        size="sm"
+        variant="secondary"
+        icon="refresh"
+        loading={pending}
         onClick={retry}
-        disabled={pending}
-        className="rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800"
       >
-        {pending ? "Retrying…" : "Retry"}
-      </button>
+        Retry
+      </Button>
     </span>
   );
 }
