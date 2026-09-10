@@ -133,7 +133,15 @@ server every visit. To keep tab / page switching fast:
 - ITC tile = `itcEligibleAmount()` over `expense_taxes` rows
   (`CGST/SGST/IGST/CESS`) joined to confirmed **domestic** (`country = 'IN'` /
   null) expenses, bucketed by the same quarter windows + an FY total.
-- `?business=` filter: reuse the `byBiz()` helper pattern already in the page.
+- `?business=` filter: reuse the `byBiz()` helper. `?view=` (All / Purchase
+  orders / Expenses) uses `byView()` — same shape, `.eq("record_type", v)` for
+  `v in {invoice, expense}`. Both applied to the spend + ITC roll-ups; the
+  PO-vs-Expense split tiles stay global.
+- **Charts are inline SVG / CSS server components** (`components/dashboard-charts.tsx`)
+  — no charting library, no `"use client"`. Keep it that way unless real
+  interactivity is needed. Feed them from the already-filtered `rows` set;
+  floor every `max` at 1 and `Number()`-coerce amounts so geometry can't go
+  `NaN`.
 
 ## Data model reminders
 

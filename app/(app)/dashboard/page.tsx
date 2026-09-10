@@ -5,6 +5,11 @@ import { PageHeader } from "@/components/page-header";
 import { Card, Icon } from "@/components/ui";
 import { BusinessTabs } from "@/components/business-tabs";
 import { RecordViewTabs } from "@/components/record-view-tabs";
+import {
+  CategoryDonut,
+  MonthlyTrend,
+  TopVendorsBar,
+} from "@/components/dashboard-charts";
 import { APP_NAME } from "@/lib/constants";
 import { isUuid } from "@/lib/uuid";
 import { financialYearOf } from "@/lib/tax/fy";
@@ -99,7 +104,9 @@ export default async function DashboardPage({
       byBiz(
         supabase
           .from("expenses")
-          .select("id, invoice_date, amount_inr, total, currency, country")
+          .select(
+            "id, invoice_date, amount_inr, total, currency, country, category_id, vendor_id",
+          )
           .in("status", ["confirmed", "exported"])
           .gte("invoice_date", isoDate(fy.start))
           .lt("invoice_date", isoDate(fy.end)),
@@ -163,6 +170,64 @@ export default async function DashboardPage({
     if (r.record_type === "invoice") poValue += Number(amt);
     else expValue += Number(amt);
   }
+
+  // ---- chart data: monthly trend, category donut, top vendors --------------
+  const monthly = Array.from({ length: 12 }, (_, i) => ({
+    label: MONTH(new Date(fy.startYear, 3 + i, 1)),
+    value: 0,
+  }));
+  const spendByCategory = new Map<string, number>();
+  const spendByVendor = new Map<string, number>();
+  let uncategorisedSpend = 0;
+  for (const r of rows ?? []) {
+    if (!r.invoice_date) continue;
+    const amt = r.amount_inr ?? (r.currency === "INR" ? r.total : null);
+    const n = Number(amt);
+    if (amt == null || !Number.isFinite(n)) continue;
+    const d = new Date(`${r.invoice_date}T00:00:00`);
+    const mi = (d.getFullYear() - fy.startYear) * 12 + d.getMonth() - 3;
+    if (mi >= 0 && mi < 12) monthly[mi].value += n;
+    if (r.category_id)
+      spendByCategory.set(
+        r.category_id,
+        (spendByCategory.get(r.category_id) ?? 0) + n,
+      );
+    else uncategorisedSpend += n;
+    if (r.vendor_id)
+      spendByVendor.set(
+        r.vendor_id,
+        (spendByVendor.get(r.vendor_id) ?? 0) + n,
+      );
+  }
+
+  const catIds = [...spendByCategory.keys()];
+  const venIds = [...spendByVendor.keys()];
+  const [{ data: catNameRows }, { data: venNameRows }] = await Promise.all([
+    catIds.length
+      ? supabase.from("categories").select("id, name").in("id", catIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    venIds.length
+      ? supabase.from("vendors").select("id, name").in("id", venIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+  const catNameById = new Map((catNameRows ?? []).map((c) => [c.id, c.name]));
+  const venNameById = new Map((venNameRows ?? []).map((v) => [v.id, v.name]));
+
+  const TOP_N = 6;
+  const sortedCategories = [...spendByCategory.entries()]
+    .map(([id, value]) => ({ label: catNameById.get(id) ?? "—", value }))
+    .sort((a, b) => b.value - a.value);
+  const categorySlices = sortedCategories.slice(0, TOP_N);
+  const categoryRest =
+    sortedCategories.slice(TOP_N).reduce((s, x) => s + x.value, 0) +
+    uncategorisedSpend;
+  if (categoryRest > 0)
+    categorySlices.push({ label: "Other / uncategorised", value: categoryRest });
+
+  const topVendors = [...spendByVendor.entries()]
+    .map(([id, value]) => ({ label: venNameById.get(id) ?? "—", value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, TOP_N);
 
   return (
     <>
@@ -297,11 +362,10 @@ export default async function DashboardPage({
         </p>
       </section>
 
-      <section className="mt-8">
-        <Card className="flex items-center gap-3 p-4 text-sm text-zinc-500">
-          <Icon name="dashboard" className="size-5 shrink-0 text-zinc-400" />
-          Trend, category split and top-vendor charts arrive in Phase&nbsp;3.
-        </Card>
+      <section className="mt-8 grid gap-4 lg:grid-cols-2">
+        <MonthlyTrend points={monthly} caption={`FY ${fy.label}`} />
+        <CategoryDonut slices={categorySlices} />
+        <TopVendorsBar rows={topVendors} />
       </section>
     </>
   );

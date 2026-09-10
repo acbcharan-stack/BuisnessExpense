@@ -21,7 +21,7 @@ before committing. See project memory `security-standards.md`.
       editable **(deferred with item 4 — it feeds the Zoho export)**
 - [x] 6. Dashboard tax tile — ITC-eligible GST per quarter and full FY
 - [x] 7. Dashboard toggle — All / Purchase Orders / Expenses
-- [ ] 8. Dashboard charts — monthly trend line, category donut, top-vendors bar
+- [x] 8. Dashboard charts — monthly trend line, category donut, top-vendors bar
 
 ## What was already done before Phase 3 work started
 
@@ -167,3 +167,36 @@ Security choices, plainly:
   are counted.
 
 Checks: `typecheck`, `lint`, `test` (45), `build` all pass.
+
+### 2026-09-10 — Item 8: dashboard charts
+
+- `components/dashboard-charts.tsx` (new) — `MonthlyTrend` (inline-SVG area +
+  line, 12 Apr–Mar buckets), `CategoryDonut` (stroke-dasharray arcs + legend,
+  top 6 + "Other / uncategorised"), `TopVendorsBar` (CSS bars, top 6). All
+  **server components, no charting library, no client JS** — deliberate: the
+  dashboard is otherwise fully server-rendered and the perf work in item 1
+  keeps it that way. (Plan named Recharts; skipped to avoid a ~200 KB client
+  lib + hydration for three small charts. Swap in later if richer interaction
+  is wanted.)
+- `dashboard/page.tsx` — reuses the same `rows` set (already `?business=` +
+  `?view=` filtered) for month / category / vendor roll-ups; one extra
+  `Promise.all` resolves category + vendor names for the ids present.
+  Placeholder card removed.
+- Every amount is `Number()`-coerced and dropped unless finite; slice/bar
+  widths are ratios of a `max` that is floored at 1, so a stray value can't
+  produce `NaN`/`Infinity` geometry.
+
+Checks: `typecheck`, `lint`, `test` (45), `build` all pass.
+
+---
+
+## Phase 3 status
+
+Done: 1 pagination · 2 filters · 3 CSV + filter-aware export · 6 ITC tile ·
+7 view toggle · 8 charts. Local commits `c9a7263`, `9dc888b`, `094d3ab`,
+`5db2f47`, + item 8 — **all still unpushed** (git creds are `kraftsboon`, repo
+is `acbcharan-stack`; run `git push origin main` after fixing the credential).
+
+Deferred: **4 Zoho Books CSV** + **5 Settings Zoho-account editor** — waiting on
+the user's real Zoho import template header row. Layout decided: Bills format
+for Purchase Orders, Expenses format for expenses.
