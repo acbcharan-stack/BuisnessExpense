@@ -23,8 +23,8 @@ export async function RecordsList({ recordType }: { recordType: RecordType }) {
   if (!rows || rows.length === 0) {
     return (
       <EmptyState icon={recordType === "invoice" ? "invoice" : "expense"}>
-        No {recordType === "invoice" ? "invoices" : "expenses"} yet. Capture one
-        from the Inbox and it lands here after review.
+        No {recordType === "invoice" ? "purchase orders" : "expenses"} yet.
+        Capture one from the Inbox and it lands here after review.
       </EmptyState>
     );
   }

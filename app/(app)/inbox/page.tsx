@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { Badge, Card, Icon } from "@/components/ui";
+import { RECORD_TYPE_LABELS_SHORT } from "@/lib/types";
 import { UploadDropzone } from "./upload-dropzone";
 import { RetryButton } from "./retry-button";
 
@@ -45,6 +46,24 @@ export default async function InboxPage() {
 
       <UploadDropzone />
 
+      <div className="mt-3 flex items-center gap-3 text-xs text-zinc-400">
+        <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+        or
+        <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+      </div>
+
+      <Link
+        href="/records/new"
+        className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm transition hover:border-blue-400 hover:bg-zinc-50 active:scale-[.99] dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/50"
+      >
+        <span className="flex items-center gap-2">
+          <Icon name="plus" className="size-4 text-zinc-400" />
+          Enter a receipt manually
+          <span className="text-xs text-zinc-400">— no photo or AI scan</span>
+        </span>
+        <Icon name="chevronRight" className="size-4 text-zinc-300" />
+      </Link>
+
       <section className="mt-8">
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
           <Icon name="clock" className="size-4 text-zinc-400" />
@@ -66,7 +85,7 @@ export default async function InboxPage() {
                 className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition first:rounded-t-xl last:rounded-b-xl hover:bg-zinc-50 active:scale-[.995] dark:hover:bg-zinc-800/50"
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <Badge>{e.record_type}</Badge>
+                  <Badge>{RECORD_TYPE_LABELS_SHORT[e.record_type]}</Badge>
                   <span className="truncate">
                     {e.invoice_number ?? "(no number)"}
                   </span>

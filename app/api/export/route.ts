@@ -39,21 +39,27 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  if (!profile || (profile.role !== "owner" && profile.role !== "accountant")) {
-    return NextResponse.json(
-      { error: "Only an owner or accountant can export." },
-      { status: 403 },
-    );
-  }
-
-  const typeParam = new URL(request.url).searchParams.get("type");
+  const params = new URL(request.url).searchParams;
+  const singleId = params.get("id");
+  const typeParam = params.get("type");
   const recordType =
     typeParam === "invoice" || typeParam === "expense" ? typeParam : null;
+
+  // Bulk export is manager-only; a single record can be exported by anyone
+  // who can already open it.
+  if (!singleId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (!profile || (profile.role !== "owner" && profile.role !== "accountant")) {
+      return NextResponse.json(
+        { error: "Only an owner or accountant can export all records." },
+        { status: 403 },
+      );
+    }
+  }
 
   const admin = createAdminClient();
 
@@ -62,13 +68,17 @@ export async function GET(request: Request) {
     .select("*")
     .order("invoice_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
-  if (recordType) query = query.eq("record_type", recordType);
+  if (singleId) query = query.eq("id", singleId);
+  else if (recordType) query = query.eq("record_type", recordType);
 
   const { data: expenses, error } = await query;
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   const rows = expenses ?? [];
+  if (singleId && rows.length === 0) {
+    return NextResponse.json({ error: "Record not found." }, { status: 404 });
+  }
   const ids = rows.map((e) => e.id);
   const vendorIds = [
     ...new Set(rows.map((e) => e.vendor_id).filter(Boolean)),
@@ -115,11 +125,15 @@ export async function GET(request: Request) {
     profiles: profiles.data ?? [],
   });
 
-  const label = recordType
-    ? recordType === "invoice"
-      ? "invoices"
-      : "expenses"
-    : "all-records";
+  const label = singleId
+    ? (rows[0]?.invoice_number ?? "record")
+        .replace(/[^\w.-]+/g, "-")
+        .slice(0, 40)
+    : recordType
+      ? recordType === "invoice"
+        ? "purchase-orders"
+        : "expenses"
+      : "all-records";
   const today = new Date().toISOString().slice(0, 10);
 
   return new NextResponse(buffer as ArrayBuffer, {

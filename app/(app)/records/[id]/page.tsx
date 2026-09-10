@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/supabase/auth";
 import { createSignedDocumentUrl } from "@/lib/supabase/storage";
 import { PageHeader } from "@/components/page-header";
+import { ExportButton } from "@/components/export-button";
 import { ReviewForm, type ReviewFormData } from "./review-form";
 
 export const metadata: Metadata = { title: "Review · Invoice Scanner" };
@@ -33,11 +34,13 @@ export default async function RecordReviewPage({
     { data: vendors },
     { data: job },
   ] = await Promise.all([
-    supabase
-      .from("documents")
-      .select("id, storage_path, original_filename, mime_type")
-      .eq("id", expense.document_id)
-      .maybeSingle(),
+    expense.document_id
+      ? supabase
+          .from("documents")
+          .select("id, storage_path, original_filename, mime_type")
+          .eq("id", expense.document_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     supabase
       .from("expense_line_items")
       .select("*")
@@ -50,13 +53,15 @@ export default async function RecordReviewPage({
       .eq("is_archived", false)
       .order("name", { ascending: true }),
     supabase.from("vendors").select("id, name").order("name").limit(500),
-    supabase
-      .from("extraction_jobs")
-      .select("raw_response, status, gemini_model")
-      .eq("document_id", expense.document_id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    expense.document_id
+      ? supabase
+          .from("extraction_jobs")
+          .select("raw_response")
+          .eq("document_id", expense.document_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const signedUrl = document?.storage_path
@@ -75,6 +80,7 @@ export default async function RecordReviewPage({
     expenseId: expense.id,
     status: expense.status,
     canManage: profile.role === "owner" || profile.role === "accountant",
+    manual: !expense.document_id,
     document: {
       mimeType: document?.mime_type ?? null,
       filename: document?.original_filename ?? null,
@@ -111,6 +117,10 @@ export default async function RecordReviewPage({
         amount: t.amount ?? "",
         jurisdiction: t.jurisdiction ?? "",
       })),
+      custom_fields: (expense.custom_fields ?? []).map((f) => ({
+        label: f.label ?? "",
+        value: f.value ?? "",
+      })),
     },
   };
 
@@ -120,9 +130,10 @@ export default async function RecordReviewPage({
         title="Review record"
         description={
           expense.status === "review"
-            ? "Check what Gemini extracted, fix anything wrong, then confirm."
-            : `This record is ${expense.status}. Editing is disabled.`
+            ? "Check the details, fix anything wrong, then confirm."
+            : `This record is ${expense.status}.`
         }
+        action={<ExportButton type="all" recordId={expense.id} label="Export this record" />}
       />
       <ReviewForm data={data} />
     </>

@@ -101,9 +101,11 @@ export type ExtractionJobRow = {
   created_at: string;
 };
 
+export type CustomField = { label: string; value: string };
+
 export type ExpenseRow = {
   id: string;
-  document_id: string;
+  document_id: string | null;
   vendor_id: string | null;
   category_id: string | null;
   record_type: RecordTypeDb;
@@ -119,6 +121,7 @@ export type ExpenseRow = {
   fx_rate: number;
   amount_inr: number | null;
   notes: string | null;
+  custom_fields: CustomField[];
   category_set_by: string | null;
   status: ExpenseStatusDb;
   confirmed_by: string | null;

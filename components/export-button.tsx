@@ -10,9 +10,11 @@ import { Button } from "@/components/ui";
  */
 export function ExportButton({
   type,
+  recordId,
   label = "Export to Excel",
 }: {
   type: "invoice" | "expense" | "all";
+  recordId?: string;
   label?: string;
 }) {
   const [busy, setBusy] = useState(false);
@@ -22,8 +24,11 @@ export function ExportButton({
     setBusy(true);
     setError(null);
     try {
-      const qs = type === "all" ? "" : `?type=${type}`;
-      const res = await fetch(`/api/export${qs}`);
+      const params = new URLSearchParams();
+      if (recordId) params.set("id", recordId);
+      else if (type !== "all") params.set("type", type);
+      const qs = params.toString();
+      const res = await fetch(`/api/export${qs ? `?${qs}` : ""}`);
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as {
           error?: string;

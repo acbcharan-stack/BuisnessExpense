@@ -5,11 +5,95 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireProfile, assertRole } from "@/lib/supabase/auth";
 import { normalizeVendorName } from "@/lib/extraction/match";
-import { recordFormSchema, type RecordFormValues } from "./form-schema";
+import type { CustomField, ProfileRow } from "@/lib/supabase/database.types";
+import {
+  recordFormSchema,
+  type RecordFormValues,
+  type RecordFormParsed,
+} from "./form-schema";
 
 export interface ActionResult {
   ok: boolean;
   error?: string;
+  id?: string;
+}
+
+type Admin = ReturnType<typeof createAdminClient>;
+
+/** Keep only rows with a label; coerce to plain strings for jsonb storage. */
+function cleanCustomFields(rows: RecordFormParsed["custom_fields"]): CustomField[] {
+  return rows
+    .filter((r) => r.label)
+    .map((r) => ({ label: r.label as string, value: r.value ?? "" }));
+}
+
+async function resolveCategoryId(
+  admin: Admin,
+  v: RecordFormParsed,
+): Promise<string | null> {
+  if (!v.new_category_name) return v.category_id;
+  const { data: existing } = await admin
+    .from("categories")
+    .select("id")
+    .ilike("name", v.new_category_name)
+    .maybeSingle();
+  if (existing) return existing.id;
+  const { data: created } = await admin
+    .from("categories")
+    .insert({ name: v.new_category_name, default_record_type: v.record_type })
+    .select("id")
+    .single();
+  return created?.id ?? v.category_id;
+}
+
+async function resolveVendorId(
+  admin: Admin,
+  profile: ProfileRow,
+  v: RecordFormParsed,
+  fallbackId: string | null,
+): Promise<string | null> {
+  if (!v.vendor_name) return null;
+  const normalized = normalizeVendorName(v.vendor_name);
+  const { data: match } = await admin
+    .from("vendors")
+    .select("id")
+    .eq("normalized_name", normalized)
+    .eq("country", v.country)
+    .maybeSingle();
+  if (match) return match.id;
+  const { data: created } = await admin
+    .from("vendors")
+    .insert({
+      name: v.vendor_name,
+      normalized_name: normalized,
+      country: v.country,
+      created_by: profile.id,
+    })
+    .select("id")
+    .single();
+  return created?.id ?? fallbackId;
+}
+
+function lineItemRows(expenseId: string, v: RecordFormParsed) {
+  return v.line_items.map((li, i) => ({
+    expense_id: expenseId,
+    line_no: i + 1,
+    description: li.description,
+    hsn_sac: li.hsn_sac,
+    quantity: li.quantity,
+    unit_price: li.unit_price,
+    amount: li.amount,
+    tax_rate: li.tax_rate,
+  }));
+}
+function taxRows(expenseId: string, v: RecordFormParsed) {
+  return v.taxes.map((t) => ({
+    expense_id: expenseId,
+    tax_type: t.tax_type,
+    rate: t.rate,
+    amount: t.amount ?? 0,
+    jurisdiction: t.jurisdiction,
+  }));
 }
 
 export async function saveRecord(
@@ -47,58 +131,8 @@ export async function saveRecord(
     }
   }
 
-  // Category: create a new one on the fly if the user typed a name.
-  let categoryId = v.category_id;
-  if (v.new_category_name) {
-    const { data: existing } = await admin
-      .from("categories")
-      .select("id")
-      .ilike("name", v.new_category_name)
-      .maybeSingle();
-    if (existing) {
-      categoryId = existing.id;
-    } else {
-      const { data: created } = await admin
-        .from("categories")
-        .insert({
-          name: v.new_category_name,
-          default_record_type: v.record_type,
-        })
-        .select("id")
-        .single();
-      categoryId = created?.id ?? categoryId;
-    }
-  }
-
-  // Vendor: match or create from the typed name.
-  let vendorId = current.vendor_id;
-  if (v.vendor_name) {
-    const normalized = normalizeVendorName(v.vendor_name);
-    const { data: match } = await admin
-      .from("vendors")
-      .select("id")
-      .eq("normalized_name", normalized)
-      .eq("country", v.country)
-      .maybeSingle();
-    if (match) {
-      vendorId = match.id;
-    } else {
-      const { data: created } = await admin
-        .from("vendors")
-        .insert({
-          name: v.vendor_name,
-          normalized_name: normalized,
-          country: v.country,
-          created_by: profile.id,
-        })
-        .select("id")
-        .single();
-      vendorId = created?.id ?? vendorId;
-    }
-  } else {
-    vendorId = null;
-  }
-
+  const categoryId = await resolveCategoryId(admin, v);
+  const vendorId = await resolveVendorId(admin, profile, v, current.vendor_id);
   const amountInr = v.currency === "INR" ? v.total : current.amount_inr;
 
   const { error: updErr } = await supabase
@@ -118,38 +152,18 @@ export async function saveRecord(
       total: v.total,
       amount_inr: amountInr,
       notes: v.notes,
+      custom_fields: cleanCustomFields(v.custom_fields),
     })
     .eq("id", expenseId);
   if (updErr) return { ok: false, error: updErr.message };
 
-  // Replace child rows.
   await supabase.from("expense_line_items").delete().eq("expense_id", expenseId);
   await supabase.from("expense_taxes").delete().eq("expense_id", expenseId);
-
   if (v.line_items.length) {
-    await supabase.from("expense_line_items").insert(
-      v.line_items.map((li, i) => ({
-        expense_id: expenseId,
-        line_no: i + 1,
-        description: li.description,
-        hsn_sac: li.hsn_sac,
-        quantity: li.quantity,
-        unit_price: li.unit_price,
-        amount: li.amount,
-        tax_rate: li.tax_rate,
-      })),
-    );
+    await supabase.from("expense_line_items").insert(lineItemRows(expenseId, v));
   }
   if (v.taxes.length) {
-    await supabase.from("expense_taxes").insert(
-      v.taxes.map((t) => ({
-        expense_id: expenseId,
-        tax_type: t.tax_type,
-        rate: t.rate,
-        amount: t.amount ?? 0,
-        jurisdiction: t.jurisdiction,
-      })),
-    );
+    await supabase.from("expense_taxes").insert(taxRows(expenseId, v));
   }
 
   await admin.from("audit_log").insert({
@@ -163,6 +177,77 @@ export async function saveRecord(
   revalidatePath(`/records/${expenseId}`);
   revalidatePath("/inbox");
   return { ok: true };
+}
+
+/** Create a record by hand — no source document, no AI extraction. */
+export async function createManualRecord(
+  values: RecordFormValues,
+): Promise<ActionResult> {
+  const profile = await requireProfile();
+  try {
+    assertRole(profile, ["owner", "accountant", "staff"]);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+
+  const parsed = recordFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid form" };
+  }
+  const v = parsed.data;
+
+  const supabase = await createClient();
+  const admin = createAdminClient();
+
+  const categoryId = await resolveCategoryId(admin, v);
+  const vendorId = await resolveVendorId(admin, profile, v, null);
+
+  const { data: created, error } = await supabase
+    .from("expenses")
+    .insert({
+      document_id: null,
+      record_type: v.record_type,
+      vendor_id: vendorId,
+      category_id: categoryId,
+      category_set_by: profile.id,
+      invoice_number: v.invoice_number,
+      invoice_date: v.invoice_date,
+      due_date: v.due_date,
+      currency: v.currency,
+      country: v.country,
+      subtotal: v.subtotal,
+      tax_total: v.tax_total,
+      total: v.total,
+      amount_inr: v.currency === "INR" ? v.total : null,
+      notes: v.notes,
+      custom_fields: cleanCustomFields(v.custom_fields),
+      status: "review",
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
+    return { ok: false, error: error?.message ?? "Could not create the record." };
+  }
+
+  if (v.line_items.length) {
+    await supabase
+      .from("expense_line_items")
+      .insert(lineItemRows(created.id, v));
+  }
+  if (v.taxes.length) {
+    await supabase.from("expense_taxes").insert(taxRows(created.id, v));
+  }
+
+  await admin.from("audit_log").insert({
+    actor_id: profile.id,
+    entity: "expense",
+    entity_id: created.id,
+    action: "create_manual",
+    diff: { after: v },
+  });
+
+  revalidatePath("/inbox");
+  return { ok: true, id: created.id };
 }
 
 export async function confirmRecord(expenseId: string): Promise<ActionResult> {

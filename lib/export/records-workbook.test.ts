@@ -21,6 +21,10 @@ const expense: ExpenseRow = {
   fx_rate: 1,
   amount_inr: 118,
   notes: "handwritten total",
+  custom_fields: [
+    { label: "PO number", value: "PO-4521" },
+    { label: "Project", value: "Spindle rebuild" },
+  ],
   category_set_by: "p1",
   status: "confirmed",
   confirmed_by: "p1",
@@ -81,11 +85,13 @@ describe("buildRecordsWorkbook", () => {
       "Records",
       "Line items",
       "Taxes",
+      "Additional fields",
     ]);
 
     const records = wb.getWorksheet("Records")!;
     expect(records.rowCount).toBe(2); // header + 1
     const row = records.getRow(2).values as unknown[];
+    expect(row).toContain("Purchase Order"); // "invoice" record type is relabelled
     expect(row).toContain("INV-9");
     expect(row).toContain("Acme Tools");
     expect(row).toContain("Tooling & Inserts");
@@ -93,6 +99,7 @@ describe("buildRecordsWorkbook", () => {
 
     expect(wb.getWorksheet("Line items")!.rowCount).toBe(2);
     expect(wb.getWorksheet("Taxes")!.rowCount).toBe(2);
+    expect(wb.getWorksheet("Additional fields")!.rowCount).toBe(3); // header + 2
   });
 
   it("handles an empty dataset", async () => {

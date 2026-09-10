@@ -8,7 +8,7 @@ import { Icon, SubmitButton } from "@/components/ui";
 const LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/inbox", label: "Inbox", icon: "inbox" },
-  { href: "/invoices", label: "Invoices", icon: "invoice" },
+  { href: "/invoices", label: "Purchase Orders", icon: "invoice" },
   { href: "/expenses", label: "Expenses", icon: "expense" },
   { href: "/settings", label: "Settings", icon: "settings" },
 ];

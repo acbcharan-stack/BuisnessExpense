@@ -7,6 +7,19 @@ export type UserRole = (typeof USER_ROLES)[number];
 export const RECORD_TYPES = ["invoice", "expense"] as const;
 export type RecordType = (typeof RECORD_TYPES)[number];
 
+/**
+ * User-facing labels. The `invoice` record type is shown as "Purchase Order"
+ * across the UI and exports; the stored enum value stays `invoice`.
+ */
+export const RECORD_TYPE_LABELS: Record<RecordType, string> = {
+  invoice: "Purchase Order",
+  expense: "Expense",
+};
+export const RECORD_TYPE_LABELS_SHORT: Record<RecordType, string> = {
+  invoice: "PO",
+  expense: "Expense",
+};
+
 /** Finer classification, suggested by the extractor, editable by users. */
 export const EXPENSE_TYPES = [
   "invoice",

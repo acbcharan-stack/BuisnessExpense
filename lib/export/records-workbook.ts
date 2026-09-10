@@ -1,6 +1,7 @@
 import "server-only";
 
 import ExcelJS from "exceljs";
+import { RECORD_TYPE_LABELS } from "@/lib/types";
 import type {
   CategoryRow,
   ExpenseRow,
@@ -89,7 +90,7 @@ export async function buildRecordsWorkbook(
     const v = e.vendor_id ? vendorById.get(e.vendor_id) : undefined;
     const c = e.category_id ? categoryById.get(e.category_id) : undefined;
     records.addRow({
-      record_type: e.record_type,
+      record_type: RECORD_TYPE_LABELS[e.record_type] ?? e.record_type,
       status: e.status,
       invoice_number: e.invoice_number ?? "",
       invoice_date: asDate(e.invoice_date),
@@ -145,7 +146,7 @@ export async function buildRecordsWorkbook(
     const e = expenseById.get(li.expense_id);
     const v = e?.vendor_id ? vendorById.get(e.vendor_id) : undefined;
     lines.addRow({
-      record_type: e?.record_type ?? "",
+      record_type: e ? (RECORD_TYPE_LABELS[e.record_type] ?? e.record_type) : "",
       invoice_number: e?.invoice_number ?? "",
       vendor: v?.name ?? "",
       invoice_date: asDate(e?.invoice_date ?? null),
@@ -183,7 +184,7 @@ export async function buildRecordsWorkbook(
     const e = expenseById.get(t.expense_id);
     const v = e?.vendor_id ? vendorById.get(e.vendor_id) : undefined;
     tax.addRow({
-      record_type: e?.record_type ?? "",
+      record_type: e ? (RECORD_TYPE_LABELS[e.record_type] ?? e.record_type) : "",
       invoice_number: e?.invoice_number ?? "",
       vendor: v?.name ?? "",
       invoice_date: asDate(e?.invoice_date ?? null),
@@ -195,6 +196,35 @@ export async function buildRecordsWorkbook(
     });
   }
   styleHeader(tax.getRow(1));
+
+  /* ---- Sheet 4: Additional fields --------------------------------- */
+  const custom = wb.addWorksheet("Additional fields", {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
+  custom.columns = [
+    { header: "Record type", key: "record_type", width: 14 },
+    { header: "Invoice number", key: "invoice_number", width: 18 },
+    { header: "Vendor", key: "vendor", width: 26 },
+    { header: "Invoice date", key: "invoice_date", width: 13, style: { numFmt: dateFmt } },
+    { header: "Field", key: "label", width: 24 },
+    { header: "Value", key: "value", width: 40 },
+    { header: "Record ID", key: "expense_id", width: 38 },
+  ];
+  for (const e of input.expenses) {
+    const v = e.vendor_id ? vendorById.get(e.vendor_id) : undefined;
+    for (const f of e.custom_fields ?? []) {
+      custom.addRow({
+        record_type: RECORD_TYPE_LABELS[e.record_type] ?? e.record_type,
+        invoice_number: e.invoice_number ?? "",
+        vendor: v?.name ?? "",
+        invoice_date: asDate(e.invoice_date),
+        label: f.label,
+        value: f.value,
+        expense_id: e.id,
+      });
+    }
+  }
+  styleHeader(custom.getRow(1));
 
   return wb.xlsx.writeBuffer();
 }

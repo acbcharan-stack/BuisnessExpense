@@ -98,7 +98,11 @@ export default async function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat icon="clock" label="Awaiting review" value={pendingReview ?? 0} />
         <Stat icon="file" label="Records captured" value={totalRecords ?? 0} />
-        <Stat icon="invoice" label="Invoices" value={invoiceCount ?? 0} />
+        <Stat
+          icon="invoice"
+          label="Purchase orders"
+          value={invoiceCount ?? 0}
+        />
         <Stat icon="expense" label="Expenses" value={expenseCount ?? 0} />
       </div>
 

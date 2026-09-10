@@ -4,7 +4,9 @@ import { PageHeader } from "@/components/page-header";
 import { ExportButton } from "@/components/export-button";
 import { RecordsList } from "../records-list";
 
-export const metadata: Metadata = { title: "Invoices · Invoice Scanner" };
+export const metadata: Metadata = {
+  title: "Purchase Orders · Invoice Scanner",
+};
 export const dynamic = "force-dynamic";
 
 export default async function InvoicesPage() {
@@ -14,10 +16,12 @@ export default async function InvoicesPage() {
   return (
     <>
       <PageHeader
-        title="Invoices"
+        title="Purchase Orders"
         description="Supplier invoices and bills for goods & services (GST / ITC relevant)."
         action={
-          canManage ? <ExportButton type="invoice" label="Export invoices" /> : null
+          canManage ? (
+            <ExportButton type="invoice" label="Export purchase orders" />
+          ) : null
         }
       />
       <RecordsList recordType="invoice" />

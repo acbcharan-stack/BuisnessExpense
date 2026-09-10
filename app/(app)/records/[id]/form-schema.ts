@@ -34,6 +34,12 @@ export const taxLineSchema = z.object({
   jurisdiction: trimmedOrNull,
 });
 
+/** Free-form extra fields the reviewer adds. Blank rows are dropped on save. */
+export const customFieldSchema = z.object({
+  label: trimmedOrNull,
+  value: trimmedOrNull,
+});
+
 export const recordFormSchema = z.object({
   record_type: z.enum(RECORD_TYPES),
   vendor_name: trimmedOrNull,
@@ -56,6 +62,7 @@ export const recordFormSchema = z.object({
   notes: trimmedOrNull,
   line_items: z.array(lineItemSchema),
   taxes: z.array(taxLineSchema),
+  custom_fields: z.array(customFieldSchema).default([]),
 });
 
 export type RecordFormValues = z.input<typeof recordFormSchema>;

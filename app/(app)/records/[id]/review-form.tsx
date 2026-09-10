@@ -2,11 +2,11 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { RECORD_TYPES, TAX_TYPES } from "@/lib/types";
+import { RECORD_TYPES, RECORD_TYPE_LABELS, TAX_TYPES } from "@/lib/types";
 import type { RecordType, TaxType } from "@/lib/types";
 import { Badge, Button, Card, Icon } from "@/components/ui";
 import type { RecordFormValues } from "./form-schema";
-import { saveRecord, confirmRecord } from "./actions";
+import { saveRecord, confirmRecord, createManualRecord } from "./actions";
 
 type Scalarish = string | number;
 
@@ -14,6 +14,9 @@ export interface ReviewFormData {
   expenseId: string;
   status: string;
   canManage: boolean;
+  manual: boolean;
+  /** "create" = new manual record (no id yet); "review" = existing record. */
+  mode?: "create" | "review";
   document: {
     mimeType: string | null;
     filename: string | null;
@@ -54,6 +57,7 @@ export interface ReviewFormData {
       amount: Scalarish;
       jurisdiction: string;
     }[];
+    custom_fields: { label: string; value: string }[];
   };
 }
 
@@ -71,6 +75,10 @@ interface TaxState {
   amount: string;
   jurisdiction: string;
 }
+interface CustomFieldState {
+  label: string;
+  value: string;
+}
 interface FormState {
   record_type: RecordType;
   vendor_name: string;
@@ -87,6 +95,7 @@ interface FormState {
   notes: string;
   line_items: LineItemState[];
   taxes: TaxState[];
+  custom_fields: CustomFieldState[];
 }
 
 const s = (v: Scalarish): string => (v === "" || v == null ? "" : String(v));
@@ -146,6 +155,7 @@ const emptyTax: TaxState = {
   amount: "",
   jurisdiction: "",
 };
+const emptyCustom: CustomFieldState = { label: "", value: "" };
 
 function buildInitial(d: ReviewFormData["initial"]): FormState {
   return {
@@ -176,6 +186,10 @@ function buildInitial(d: ReviewFormData["initial"]): FormState {
       amount: s(t.amount),
       jurisdiction: t.jurisdiction,
     })),
+    custom_fields: d.custom_fields.map((f) => ({
+      label: f.label,
+      value: f.value,
+    })),
   };
 }
 
@@ -192,12 +206,14 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
   );
   const [form, setForm] = useState<FormState>(() => buildInitial(data.initial));
 
-  const isReview = data.status === "review";
+  const isCreate = data.mode === "create";
+  const isReview = isCreate || data.status === "review";
   const locked =
-    data.status === "exported" ||
-    data.status === "archived" ||
-    (data.status === "confirmed" && !data.canManage);
-  const [editing, setEditing] = useState(isReview);
+    !isCreate &&
+    (data.status === "exported" ||
+      data.status === "archived" ||
+      (data.status === "confirmed" && !data.canManage));
+  const [editing, setEditing] = useState(isCreate || data.status === "review");
   const readOnly = locked || !editing;
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -213,6 +229,13 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
     setForm((f) => ({
       ...f,
       taxes: f.taxes.map((t, idx) => (idx === i ? { ...t, ...patch } : t)),
+    }));
+  const setCustom = (i: number, patch: Partial<CustomFieldState>) =>
+    setForm((f) => ({
+      ...f,
+      custom_fields: f.custom_fields.map((c, idx) =>
+        idx === i ? { ...c, ...patch } : c,
+      ),
     }));
 
   const values: RecordFormValues = useMemo(
@@ -232,6 +255,7 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
       notes: form.notes,
       line_items: form.line_items,
       taxes: form.taxes,
+      custom_fields: form.custom_fields,
     }),
     [form],
   );
@@ -241,6 +265,22 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
   const totalMismatch =
     form.total !== "" &&
     Math.abs(num(form.subtotal) + num(form.tax_total) - num(form.total)) > 1;
+
+  function runCreate() {
+    setFeedback(null);
+    startTransition(async () => {
+      const res = await createManualRecord(values);
+      if (!res.ok || !res.id) {
+        setFeedback({
+          kind: "err",
+          text: res.error ?? "Could not create the record.",
+        });
+        return;
+      }
+      router.push(`/records/${res.id}`);
+      router.refresh();
+    });
+  }
 
   function runSave(then?: "confirm" | "close") {
     setFeedback(null);
@@ -286,7 +326,9 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
           <div className="flex items-center justify-between border-b border-zinc-100 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800">
             <span className="flex items-center gap-1.5 truncate">
               <Icon name="file" className="size-4 shrink-0" />
-              <span className="truncate">{filename ?? "Document"}</span>
+              <span className="truncate">
+                {data.manual ? "Manually entered — no document" : filename ?? "Document"}
+              </span>
             </span>
             {signedUrl && (
               <a
@@ -300,7 +342,13 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
             )}
           </div>
           <div className="bg-zinc-50 p-3 dark:bg-zinc-950/40">
-            {showImg ? (
+            {data.manual ? (
+              <div className="flex flex-col items-center gap-2 p-10 text-center text-sm text-zinc-500">
+                <Icon name="file" className="size-8 text-zinc-300" />
+                This record was entered by hand. Fill in the fields on the
+                right.
+              </div>
+            ) : showImg ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={signedUrl}
@@ -330,12 +378,18 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
         className="space-y-5"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!readOnly) runSave(isReview ? undefined : "close");
+          if (readOnly) return;
+          if (isCreate) runCreate();
+          else runSave(data.status === "review" ? undefined : "close");
         }}
       >
         {/* status strip */}
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Badge tone="status">{data.status}</Badge>
+          {isCreate ? (
+            <Badge>new manual record</Badge>
+          ) : (
+            <Badge tone="status">{data.status}</Badge>
+          )}
           {data.confidence != null && (
             <span className="text-xs text-zinc-500">
               AI confidence {Math.round(data.confidence * 100)}%
@@ -369,13 +423,13 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
                 type="button"
                 disabled={readOnly}
                 onClick={() => set("record_type", rt)}
-                className={`rounded-md px-3.5 py-1.5 text-sm capitalize transition active:scale-[.97] ${
+                className={`rounded-md px-3.5 py-1.5 text-sm transition active:scale-[.97] ${
                   form.record_type === rt
                     ? "bg-blue-600 text-white dark:bg-blue-500"
                     : "text-zinc-600 disabled:opacity-60 dark:text-zinc-300"
                 }`}
               >
-                {rt}
+                {RECORD_TYPE_LABELS[rt]}
               </button>
             ))}
           </div>
@@ -786,6 +840,78 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
           </div>
         </Card>
 
+        {/* Additional / custom fields */}
+        <Card className="p-3">
+          <SectionTitle
+            action={
+              !readOnly && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="plus"
+                  onClick={() =>
+                    set("custom_fields", [
+                      ...form.custom_fields,
+                      { ...emptyCustom },
+                    ])
+                  }
+                >
+                  Add field
+                </Button>
+              )
+            }
+          >
+            Additional fields{" "}
+            <span className="font-normal text-zinc-400">
+              ({form.custom_fields.length})
+            </span>
+          </SectionTitle>
+          {form.custom_fields.length === 0 ? (
+            <p className="px-1 py-2 text-xs text-zinc-400">
+              Anything not on the receipt — PO number, GRN, project code,
+              payment reference… These are included in the Excel export.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {form.custom_fields.map((c, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    aria-label={`Field ${i + 1} name`}
+                    className={`${inputCls} sm:max-w-[40%]`}
+                    placeholder="Field name"
+                    value={c.label}
+                    disabled={readOnly}
+                    onChange={(e) => setCustom(i, { label: e.target.value })}
+                  />
+                  <input
+                    aria-label={`Field ${i + 1} value`}
+                    className={inputCls}
+                    placeholder="Value"
+                    value={c.value}
+                    disabled={readOnly}
+                    onChange={(e) => setCustom(i, { value: e.target.value })}
+                  />
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      aria-label={`Remove field ${i + 1}`}
+                      className="shrink-0 rounded p-1.5 text-zinc-400 transition hover:bg-red-50 hover:text-red-600 active:scale-90 dark:hover:bg-red-950/40"
+                      onClick={() =>
+                        set(
+                          "custom_fields",
+                          form.custom_fields.filter((_, idx) => idx !== i),
+                        )
+                      }
+                    >
+                      <Icon name="x" className="size-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
         <Field label="Notes">
           <textarea
             className={`${inputCls} min-h-20`}
@@ -819,7 +945,17 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
         {!readOnly && (
           <div className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 lg:static lg:mt-2 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
             <div className="mx-auto flex max-w-6xl items-center gap-3 lg:max-w-none">
-              {isReview ? (
+              {isCreate ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  icon="check"
+                  loading={pending}
+                  onClick={runCreate}
+                >
+                  Create record
+                </Button>
+              ) : isReview ? (
                 <>
                   <Button
                     type="button"
