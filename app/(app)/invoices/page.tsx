@@ -4,30 +4,35 @@ import { requireProfile } from "@/lib/supabase/auth";
 import { PageHeader } from "@/components/page-header";
 import { ExportButton } from "@/components/export-button";
 import { BusinessTabs } from "@/components/business-tabs";
+import { RecordsFilters } from "@/components/records-filters";
 import { APP_NAME } from "@/lib/constants";
-import { RecordsList } from "../records-list";
+import { parseRecordFilters } from "@/lib/records-filter";
+import { RecordsList, loadRecordListChrome } from "../records-list";
 
 export const metadata: Metadata = {
   title: `Purchase Orders · ${APP_NAME}`,
 };
 export const dynamic = "force-dynamic";
 
+type SearchParams = Record<string, string | string[] | undefined>;
+
 export default async function InvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ business?: string; page?: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const [{ business, page }, profile, supabase] = await Promise.all([
-    searchParams,
-    requireProfile(),
-    createClient(),
-  ]);
+  const supabase = await createClient();
+  const [sp, profile, { businesses, categories, vendors, countries }] =
+    await Promise.all([
+      searchParams,
+      requireProfile(),
+      loadRecordListChrome(supabase, "invoice"),
+    ]);
   const canManage = profile.role === "owner" || profile.role === "accountant";
-  const { data: businesses } = await supabase
-    .from("businesses")
-    .select("id, name")
-    .eq("is_archived", false)
-    .order("sort", { ascending: true });
+
+  const business = typeof sp.business === "string" ? sp.business : "";
+  const page = typeof sp.page === "string" ? sp.page : undefined;
+  const filters = parseRecordFilters(sp);
 
   return (
     <>
@@ -44,14 +49,20 @@ export default async function InvoicesPage({
           ) : null
         }
       />
-      {(businesses?.length ?? 0) > 0 && (
-        <BusinessTabs businesses={businesses ?? []} />
-      )}
+      {businesses.length > 0 && <BusinessTabs businesses={businesses} />}
+      <RecordsFilters
+        filters={filters}
+        businessFilter={business}
+        categories={categories}
+        vendors={vendors}
+        countries={countries}
+      />
       <RecordsList
         recordType="invoice"
         canManage={canManage}
-        businessFilter={business ?? ""}
+        businessFilter={business}
         pageParam={page}
+        filters={filters}
       />
     </>
   );

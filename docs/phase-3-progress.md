@@ -11,7 +11,7 @@ before committing. See project memory `security-standards.md`.
 ## Checklist
 
 - [x] 1. Pagination + prev/next nav on Purchase Orders & Expenses lists
-- [ ] 2. List filters — date range, category, vendor, status, country, text search
+- [x] 2. List filters — date range, category, vendor, status, country, text search
 - [ ] 3. CSV export — plain-CSV option alongside the existing .xlsx, same filters
 - [ ] 4. Zoho Books CSV — export in Zoho's Bills/Expenses import layout
 - [ ] 5. Settings editor — make the category -> Zoho-account mapping table editable
@@ -70,3 +70,38 @@ Security choices, in plain terms:
   record lists are never meaningfully stale.
 
 Checks: `typecheck`, `lint`, `test` (27), `build` all pass.
+Commit `c9a7263` (push blocked — machine git creds are for `kraftsboon`, not
+`acbcharan-stack`; user to `git push origin main` once that's fixed).
+
+### 2026-09-10 — Item 2: list filters
+
+- `lib/records-filter.ts` (new) — `RecordFilters` type + `parseRecordFilters()`
+  (validates every URL value: `q` trimmed + 100-char cap; `from`/`to` must be
+  `YYYY-MM-DD` and are swapped if reversed; `category`/`vendor` must be UUIDs;
+  `status` must be in `EXPENSE_STATUSES`; `country` letters+spaces ≤32, upper).
+  `buildTextSearchOr()` / `likeValue()` build the one PostgREST `.or()` string,
+  double-quoting + backslash-escaping the term so `,` `.` `(` `)` `"` in a search
+  can't split or inject filter clauses. `lib/records-filter.test.ts` — 13 cases.
+- `components/records-filters.tsx` (new) — plain GET `<form>`, no client JS.
+  Search / from / to / category / vendor / status / country(when >1 present).
+  Hidden `business` input keeps the tab; omitting `page` resets to page 1;
+  "Clear" link drops every filter but the business tab.
+- `app/(app)/records-list.tsx` — `loadRecordListChrome(supabase, recordType)`
+  (businesses + category/vendor options + distinct country codes in one
+  round trip). `RecordsList` takes `filters`, resolves vendor-name matches to
+  ids first (capped at 300), then applies `.gte/.lte/.eq/.or`. Empty result with
+  active filters shows "no match — Clear filters", not the first-run empty state.
+- `invoices/page.tsx` / `expenses/page.tsx` — parse filters, load chrome in the
+  same `Promise.all` as auth, render `<RecordsFilters>` above the table.
+
+Security choices, plainly:
+- **Every filter box is retyped onto our own form.** A date that isn't a real
+  `YYYY-MM-DD`, an id that isn't a UUID, a status we don't recognise — all
+  dropped, not passed on.
+- **The search term can't smuggle in commands.** It only ever reaches the
+  database wrapped in quotes with its special characters defanged, so typing
+  `"), status.eq.confirmed, ("` just searches for that text.
+- **Lists stay bounded.** Search folds in at most 300 matching vendors; the
+  vendor dropdown caps at 1000; the country scan at 5000 rows.
+
+Checks: `typecheck`, `lint`, `test` (40), `build` all pass.

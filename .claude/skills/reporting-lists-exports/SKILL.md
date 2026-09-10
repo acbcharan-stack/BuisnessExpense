@@ -45,19 +45,25 @@ progress + decisions: `docs/phase-3-progress.md`.
 
 ### Untrusted query params
 
+`lib/records-filter.ts` (`parseRecordFilters`) is the worked example — reuse it,
+don't reinvent. Rules it follows:
+
 - **ids** (`business`, `category`, `vendor`, `id`): `isUuid()` from `lib/uuid.ts`
   before using. Literal sentinels like `unassigned` are matched explicitly.
 - **page**: `parsePageParam()` from `lib/pagination.ts` — clamps to `[1, 200]`,
   rejects `NaN` / negatives / `1e9` / arrays.
-- **enums** (`status`, `record_type`, `country`, `type`): check membership
-  against the arrays in `lib/types.ts` (`EXPENSE_STATUSES`, `RECORD_TYPES`,
-  `TAX_TYPES`, ...). Anything not in the list = ignore the filter, don't error.
+- **enums** (`status`, `record_type`, `type`): check membership against the
+  arrays in `lib/types.ts` (`EXPENSE_STATUSES`, `RECORD_TYPES`, `TAX_TYPES`).
+  Anything not in the list = ignore the filter, don't error.
 - **dates** (`from`, `to`): accept only `YYYY-MM-DD` (`/^\d{4}-\d{2}-\d{2}$/`) and
-  `Number.isFinite(Date.parse(...))`; otherwise drop the bound.
-- **free text** (`q`): trim, cap length (~100 chars), pass as a *value* to
-  PostgREST `.ilike("col", `%${q}%`)` — never interpolate into `.or()` raw filter
-  strings (that's an injection surface). Escape `%` `_` `,` `(` `)` `\` if you
-  must build an `.or()`.
+  a finite `Date.parse`; otherwise drop the bound. A reversed range is swapped.
+- **country**: upper-case, `/^[A-Z][A-Z ]{1,31}$/` (stored values are usually
+  "IN" but the review form allows a name). Only ever an `.eq()` argument.
+- **free text** (`q`): trim, cap at `MAX_SEARCH_LEN` (100). For a method call
+  like `.ilike("name", `%${q}%`)` supabase-js parameterises the value — safe.
+  For the `.or(...)` grammar string use `buildTextSearchOr()` / `likeValue()`,
+  which double-quote the term and backslash-escape `\` and `"` so `, . ( ) :`
+  can't split or inject clauses. Never string-concat `q` into `.or()` yourself.
 
 ### Paginated list query
 
