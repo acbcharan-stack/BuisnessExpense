@@ -104,19 +104,23 @@ server every visit. To keep tab / page switching fast:
 - All export goes through `app/api/export/route.ts` (`GET`). Auth: `getUser()`;
   **bulk** export (no `?id=`) is owner/accountant only, single record is anyone
   who can open it.
-- Filters accepted: `id` (uuid), `type` (`invoice`|`expense`), `business`
-  (uuid|`unassigned`). Add new filters by validating them the same way and
-  threading into both the `expenses` query and the filename `label`.
+- Params: `id` (uuid, single record), `type` (`invoice`|`expense`), `format`
+  (`csv` → CSV, anything else → xlsx), plus the full list-filter set which is
+  run through `parseRecordFilters` + `applyRecordFilters` — **bulk export always
+  matches the current filtered view**. `ExportButton` copies `business` +
+  `q/from/to/category/vendor/status/country` from `window.location.search`.
 - Data is fetched with the **admin client** after the RLS-backed auth check, and
   child rows (`expense_line_items`, `expense_taxes`) are fetched in chunks of 200
-  ids (`fetchChildren`) because PostgREST caps URL length.
-- Excel is built by `buildRecordsWorkbook`. For CSV / Zoho, add a sibling builder
-  in `lib/export/` (e.g. `records-csv.ts`, `zoho-bills-csv.ts`) with unit tests;
-  switch on a validated `format` param; set the right `Content-Type` +
-  `Content-Disposition`. CSV: quote every field, escape `"` as `""`, prefix a
-  leading `=`/`+`/`-`/`@` with `'` to defeat spreadsheet formula injection.
-- `ExportButton` downloads via `fetch` + `URL.createObjectURL` so it can show a
-  spinner and surface a 403.
+  ids (`fetchChildren`) — CSV skips them.
+- Builders in `lib/export/`: `records-workbook.ts` (xlsx, 4 sheets),
+  `records-csv.ts` (flat records CSV — **same columns as the workbook's Records
+  sheet; keep in sync**). Zoho: add `zoho-bills-csv.ts` the same way, switch on
+  `format`, set `Content-Type` + `Content-Disposition`.
+- CSV rule (`records-csv.ts` `cell()`): prefix a leading `= + - @` / tab / CR
+  with `'` (formula injection); wrap+double-quote anything with `" , \n`
+  (column break-out); lead the file with a UTF-8 BOM, CRLF line ends.
+- `ExportButton` downloads via `fetch` + `URL.createObjectURL` (spinner, 403
+  surfacing); Excel + CSV buttons share one busy state.
 
 ### Dashboard
 

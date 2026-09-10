@@ -131,3 +131,59 @@ export function buildTextSearchOr(
   }
   return parts.join(",");
 }
+
+/** Default cap on vendor-name matches folded into a text search. */
+export const MAX_TEXT_VENDOR_MATCHES = 300;
+
+// The Supabase query builder's method signatures are deeply generic; like the
+// `byBiz` helper on the dashboard we only care structurally that the filter
+// methods exist. Values passed in are still parameterised by the client.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FilterableQuery = { gte: any; lte: any; eq: any; is: any; or: any };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MinimalClient = { from: (table: string) => any };
+
+/**
+ * Look up ids of vendors whose name matches the free-text term. Runs against
+ * whichever client is passed (RLS server client on a page, service-role client
+ * in the export route). Returns [] when there is no term.
+ */
+export async function resolveTextVendorIds(
+  client: MinimalClient,
+  q: string,
+  limit: number = MAX_TEXT_VENDOR_MATCHES,
+): Promise<string[]> {
+  if (!q) return [];
+  const { data } = await client
+    .from("vendors")
+    .select("id")
+    .ilike("name", `%${q}%`)
+    .limit(limit);
+  return ((data ?? []) as { id: string }[]).map((v) => v.id);
+}
+
+/**
+ * Apply the validated filters to an `expenses` query. Each value goes to the
+ * builder as a value; the only filter-grammar string is the `.or(...)` for text
+ * search, whose term is quoted + escaped by `buildTextSearchOr` / `likeValue`.
+ * `businessFilter` is the raw `?business=` value ("" | "unassigned" | uuid).
+ */
+export function applyRecordFilters<T extends FilterableQuery>(
+  query: T,
+  filters: RecordFilters,
+  textVendorIds: string[],
+  businessFilter: string,
+): T {
+  let q = query;
+  if (businessFilter === "unassigned") q = q.is("business_id", null);
+  else if (isUuid(businessFilter)) q = q.eq("business_id", businessFilter);
+
+  if (filters.from) q = q.gte("invoice_date", filters.from);
+  if (filters.to) q = q.lte("invoice_date", filters.to);
+  if (filters.categoryId) q = q.eq("category_id", filters.categoryId);
+  if (filters.vendorId) q = q.eq("vendor_id", filters.vendorId);
+  if (filters.status) q = q.eq("status", filters.status);
+  if (filters.country) q = q.eq("country", filters.country);
+  if (filters.q) q = q.or(buildTextSearchOr(filters.q, textVendorIds));
+  return q;
+}

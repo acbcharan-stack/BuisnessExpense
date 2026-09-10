@@ -12,7 +12,7 @@ before committing. See project memory `security-standards.md`.
 
 - [x] 1. Pagination + prev/next nav on Purchase Orders & Expenses lists
 - [x] 2. List filters — date range, category, vendor, status, country, text search
-- [ ] 3. CSV export — plain-CSV option alongside the existing .xlsx, same filters
+- [x] 3. CSV export — plain-CSV option alongside the existing .xlsx, same filters
 - [ ] 4. Zoho Books CSV — export in Zoho's Bills/Expenses import layout
 - [ ] 5. Settings editor — make the category -> Zoho-account mapping table editable
 - [ ] 6. Dashboard tax tile — ITC-eligible GST per quarter and full FY
@@ -105,3 +105,35 @@ Security choices, plainly:
   vendor dropdown caps at 1000; the country scan at 5000 rows.
 
 Checks: `typecheck`, `lint`, `test` (40), `build` all pass.
+
+### 2026-09-10 — Item 3: CSV export + filter-aware exports
+
+- `lib/export/records-csv.ts` (new, + test) — `buildRecordsCsv()`, a flat
+  one-row-per-record CSV with the same columns as the workbook's "Records"
+  sheet. `cell()` guards every value: a leading `= + - @` / tab / CR gets a `'`
+  prefix (formula-injection), and anything with `" , \n` is quoted with doubled
+  quotes (column break-out). UTF-8 BOM + CRLF so Excel opens ₹ / non-ASCII
+  cleanly. 5 tests, incl. `=CMD|'/C calc'!A0`.
+- `lib/records-filter.ts` — extracted `applyRecordFilters()` (business + all six
+  list filters onto an `expenses` query) and `resolveTextVendorIds()` so the
+  list page and the export route share one implementation. `records-list.tsx`
+  refactored onto them (no behaviour change).
+- `app/api/export/route.ts` — `?format=csv` (default xlsx); bulk export now runs
+  the URL's list filters through `parseRecordFilters` + `applyRecordFilters`, so
+  "Export" gives you the rows you're actually looking at. CSV path skips the
+  line-item / tax child fetches. Filename extension follows the format.
+- `components/export-button.tsx` — now two buttons, **Excel** and **CSV**,
+  sharing the busy state; a bulk export copies `business` + `q/from/to/category/
+  vendor/status/country` from the current URL into the request.
+
+Security choices, plainly:
+- **A spreadsheet can't run what's in an exported cell.** Any value that looks
+  like a formula is turned into plain text first, so a malicious vendor name on
+  a scanned bill can't fire when the accountant opens the file.
+- **Values can't jump columns.** Quotes/commas/newlines are escaped, so a note
+  with a comma stays one cell.
+- **Export obeys the same gate + the same validation as the list.** Bulk export
+  is still owner/accountant only; the forwarded filters go through the exact
+  `parseRecordFilters` the tables use.
+
+Checks: `typecheck`, `lint`, `test` (45), `build` all pass.

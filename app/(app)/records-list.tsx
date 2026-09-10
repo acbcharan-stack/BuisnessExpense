@@ -4,7 +4,6 @@ import { EmptyState } from "@/components/page-header";
 import { Badge, Card, Icon } from "@/components/ui";
 import { DeleteRecordButton } from "@/components/delete-record-button";
 import { ListPager } from "@/components/list-pager";
-import { isUuid } from "@/lib/uuid";
 import {
   RECORDS_PAGE_SIZE,
   pageCountFor,
@@ -12,14 +11,12 @@ import {
 } from "@/lib/pagination";
 import {
   EMPTY_RECORD_FILTERS,
-  buildTextSearchOr,
+  applyRecordFilters,
   hasActiveRecordFilters,
+  resolveTextVendorIds,
   type RecordFilters,
 } from "@/lib/records-filter";
 import type { RecordType } from "@/lib/types";
-
-/** Cap on vendor-name matches folded into a text search — keeps the URL sane. */
-const MAX_VENDOR_MATCHES = 300;
 
 /** Upper bound on rows in the vendor filter dropdown. */
 const MAX_VENDOR_OPTIONS = 1000;
@@ -109,18 +106,9 @@ export async function RecordsList({
 
   // Free-text search also matches vendor names, which live in another table —
   // resolve the matching vendor ids first, then fold them into the main query.
-  // The ids come straight from the DB, so they are safe to list in a filter.
-  let textVendorIds: string[] = [];
-  if (filters.q) {
-    const { data: vs } = await supabase
-      .from("vendors")
-      .select("id")
-      .ilike("name", `%${filters.q}%`)
-      .limit(MAX_VENDOR_MATCHES);
-    textVendorIds = (vs ?? []).map((v) => v.id);
-  }
+  const textVendorIds = await resolveTextVendorIds(supabase, filters.q);
 
-  let query = supabase
+  const base = supabase
     .from("expenses")
     .select(
       "id, invoice_number, invoice_date, total, currency, status, vendor_id, category_id, business_id",
@@ -133,20 +121,7 @@ export async function RecordsList({
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  if (businessFilter === "unassigned") query = query.is("business_id", null);
-  else if (isUuid(businessFilter))
-    query = query.eq("business_id", businessFilter);
-
-  // Validated filters — each value is passed to the builder as a value, not
-  // spliced into SQL. `.or(...)` is the only filter-grammar string, and its
-  // text value is quoted + escaped by `buildTextSearchOr` / `likeValue`.
-  if (filters.from) query = query.gte("invoice_date", filters.from);
-  if (filters.to) query = query.lte("invoice_date", filters.to);
-  if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
-  if (filters.vendorId) query = query.eq("vendor_id", filters.vendorId);
-  if (filters.status) query = query.eq("status", filters.status);
-  if (filters.country) query = query.eq("country", filters.country);
-  if (filters.q) query = query.or(buildTextSearchOr(filters.q, textVendorIds));
+  const query = applyRecordFilters(base, filters, textVendorIds, businessFilter);
 
   const { data: rows, count } = await query;
 

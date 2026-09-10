@@ -2,8 +2,14 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildRecordsWorkbook } from "@/lib/export/records-workbook";
+import { buildRecordsCsv } from "@/lib/export/records-csv";
 import { APP_SLUG } from "@/lib/constants";
-import { UUID_RE, isUuid } from "@/lib/uuid";
+import { UUID_RE } from "@/lib/uuid";
+import {
+  applyRecordFilters,
+  parseRecordFilters,
+  resolveTextVendorIds,
+} from "@/lib/records-filter";
 import type {
   ExpenseLineItemRow,
   ExpenseTaxRow,
@@ -14,6 +20,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 type Admin = ReturnType<typeof createAdminClient>;
+type ExportFormat = "xlsx" | "csv";
 
 /** Chunked `.in()` — PostgREST caps URL length, so batch large id lists. */
 async function fetchChildren<T>(
@@ -42,6 +49,7 @@ export async function GET(request: Request) {
   }
 
   const params = new URL(request.url).searchParams;
+
   const idParam = params.get("id");
   const singleId = idParam && UUID_RE.test(idParam) ? idParam : null;
   if (idParam && !singleId) {
@@ -51,6 +59,10 @@ export async function GET(request: Request) {
   const recordType =
     typeParam === "invoice" || typeParam === "expense" ? typeParam : null;
   const businessParam = params.get("business") ?? "";
+  const format: ExportFormat = params.get("format") === "csv" ? "csv" : "xlsx";
+  // Same validated list filters the tables use — so "export" means "export what
+  // I'm looking at". Ignored for a single-record export.
+  const filters = parseRecordFilters(Object.fromEntries(params));
 
   // Bulk export is manager-only; a single record can be exported by anyone
   // who can already open it.
@@ -60,7 +72,10 @@ export async function GET(request: Request) {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (!profile || (profile.role !== "owner" && profile.role !== "accountant")) {
+    if (
+      !profile ||
+      (profile.role !== "owner" && profile.role !== "accountant")
+    ) {
       return NextResponse.json(
         { error: "Only an owner or accountant can export all records." },
         { status: 403 },
@@ -75,13 +90,13 @@ export async function GET(request: Request) {
     .select("*")
     .order("invoice_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
+
   if (singleId) {
     query = query.eq("id", singleId);
   } else {
     if (recordType) query = query.eq("record_type", recordType);
-    if (businessParam === "unassigned") query = query.is("business_id", null);
-    else if (isUuid(businessParam))
-      query = query.eq("business_id", businessParam);
+    const textVendorIds = await resolveTextVendorIds(admin, filters.q);
+    query = applyRecordFilters(query, filters, textVendorIds, businessParam);
   }
 
   const { data: expenses, error } = await query;
@@ -92,6 +107,7 @@ export async function GET(request: Request) {
   if (singleId && rows.length === 0) {
     return NextResponse.json({ error: "Record not found." }, { status: 404 });
   }
+
   const ids = rows.map((e) => e.id);
   const vendorIds = [
     ...new Set(rows.map((e) => e.vendor_id).filter(Boolean)),
@@ -105,12 +121,14 @@ export async function GET(request: Request) {
     ),
   ] as string[];
 
+  const needChildren = format !== "csv";
+
   const [lineItems, taxes, vendors, categories, businesses, profiles] =
     await Promise.all([
-      ids.length
+      needChildren && ids.length
         ? fetchChildren<ExpenseLineItemRow>(admin, "expense_line_items", ids)
         : Promise.resolve([]),
-      ids.length
+      needChildren && ids.length
         ? fetchChildren<ExpenseTaxRow>(admin, "expense_taxes", ids)
         : Promise.resolve([]),
       vendorIds.length
@@ -131,16 +149,6 @@ export async function GET(request: Request) {
         : Promise.resolve({ data: [] }),
     ]);
 
-  const buffer = await buildRecordsWorkbook({
-    expenses: rows,
-    lineItems,
-    taxes,
-    vendors: vendors.data ?? [],
-    categories: categories.data ?? [],
-    businesses: businesses.data ?? [],
-    profiles: profiles.data ?? [],
-  });
-
   const label = singleId
     ? (rows[0]?.invoice_number ?? "record")
         .replace(/[^\w.-]+/g, "-")
@@ -151,13 +159,42 @@ export async function GET(request: Request) {
         : "expenses"
       : "all-records";
   const today = new Date().toISOString().slice(0, 10);
+  const filename = `${APP_SLUG}-${label}-${today}.${format}`;
+
+  if (format === "csv") {
+    const csv = buildRecordsCsv({
+      expenses: rows,
+      vendors: vendors.data ?? [],
+      categories: categories.data ?? [],
+      businesses: businesses.data ?? [],
+      profiles: profiles.data ?? [],
+    });
+    return new NextResponse(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  const buffer = await buildRecordsWorkbook({
+    expenses: rows,
+    lineItems,
+    taxes,
+    vendors: vendors.data ?? [],
+    categories: categories.data ?? [],
+    businesses: businesses.data ?? [],
+    profiles: profiles.data ?? [],
+  });
 
   return new NextResponse(buffer as ArrayBuffer, {
     status: 200,
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${APP_SLUG}-${label}-${today}.xlsx"`,
+      "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
     },
   });
