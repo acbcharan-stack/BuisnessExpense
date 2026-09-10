@@ -4,28 +4,53 @@ import { requireProfile } from "@/lib/supabase/auth";
 import { PageHeader } from "@/components/page-header";
 import { Badge, Card } from "@/components/ui";
 import { APP_NAME } from "@/lib/constants";
+import { BusinessesEditor } from "./businesses-editor";
 
 export const metadata: Metadata = { title: `Settings · ${APP_NAME}` };
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const profile = await requireProfile();
+  const canManage = profile.role === "owner" || profile.role === "accountant";
   const supabase = await createClient();
 
-  const [{ data: categories }, { data: team }] = await Promise.all([
-    supabase
-      .from("categories")
-      .select("id, name, zoho_account_name, default_record_type")
-      .order("name"),
-    supabase.from("profiles").select("full_name, role").order("role"),
-  ]);
+  const [{ data: categories }, { data: team }, { data: businesses }] =
+    await Promise.all([
+      supabase
+        .from("categories")
+        .select("id, name, zoho_account_name, default_record_type")
+        .order("name"),
+      supabase.from("profiles").select("full_name, role").order("role"),
+      supabase
+        .from("businesses")
+        .select("id, name, legal_name, gstin, gst_state_code, address")
+        .eq("is_archived", false)
+        .order("sort", { ascending: true }),
+    ]);
 
   return (
     <>
       <PageHeader
         title="Settings"
-        description="Categories, Zoho account mapping and team."
+        description="Businesses, categories, Zoho account mapping and team."
       />
+
+      <section className="mb-8">
+        <h2 className="mb-2 text-sm font-semibold">
+          Your businesses{" "}
+          <span className="font-normal text-zinc-400">
+            ({businesses?.length ?? 0})
+          </span>
+        </h2>
+        <BusinessesEditor
+          businesses={businesses ?? []}
+          canManage={canManage}
+        />
+        <p className="mt-2 text-xs text-zinc-500">
+          Each record (purchase order or expense) is tagged with one of these.
+          The GSTIN is used in exports and GST logic.
+        </p>
+      </section>
 
       <section className="mb-8">
         <h2 className="mb-2 text-sm font-semibold">Team</h2>

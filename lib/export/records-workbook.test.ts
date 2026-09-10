@@ -6,6 +6,7 @@ import type { ExpenseRow } from "@/lib/supabase/database.types";
 const expense: ExpenseRow = {
   id: "11111111-1111-1111-1111-111111111111",
   document_id: "d1",
+  business_id: "b1",
   vendor_id: "v1",
   category_id: "c1",
   record_type: "invoice",
@@ -72,6 +73,9 @@ const input = {
   categories: [
     { id: "c1", name: "Tooling & Inserts", zoho_account_name: "Consumables" },
   ],
+  businesses: [
+    { id: "b1", name: "acb", gstin: "33ABCDE1234F1Z5" },
+  ],
   profiles: [{ id: "p1", full_name: "Owner" }],
 };
 
@@ -91,6 +95,7 @@ describe("buildRecordsWorkbook", () => {
     const records = wb.getWorksheet("Records")!;
     expect(records.rowCount).toBe(2); // header + 1
     const row = records.getRow(2).values as unknown[];
+    expect(row).toContain("acb"); // business name
     expect(row).toContain("Purchase Order"); // "invoice" record type is relabelled
     expect(row).toContain("INV-9");
     expect(row).toContain("Acme Tools");
@@ -109,6 +114,7 @@ describe("buildRecordsWorkbook", () => {
       taxes: [],
       vendors: [],
       categories: [],
+      businesses: [],
       profiles: [],
     });
     const wb = new ExcelJS.Workbook();

@@ -4,6 +4,7 @@ import ExcelJS from "exceljs";
 import { RECORD_TYPE_LABELS } from "@/lib/types";
 import { APP_NAME } from "@/lib/constants";
 import type {
+  BusinessRow,
   CategoryRow,
   ExpenseRow,
   ExpenseLineItemRow,
@@ -18,6 +19,7 @@ export interface WorkbookInput {
   taxes: ExpenseTaxRow[];
   vendors: Pick<VendorRow, "id" | "name" | "tax_id" | "tax_id_type" | "country">[];
   categories: Pick<CategoryRow, "id" | "name" | "zoho_account_name">[];
+  businesses: Pick<BusinessRow, "id" | "name" | "gstin">[];
   profiles: Pick<ProfileRow, "id" | "full_name">[];
 }
 
@@ -46,6 +48,9 @@ export async function buildRecordsWorkbook(
 ): Promise<ExcelJS.Buffer> {
   const vendorById = new Map(input.vendors.map((v) => [v.id, v]));
   const categoryById = new Map(input.categories.map((c) => [c.id, c]));
+  const businessById = new Map(input.businesses.map((b) => [b.id, b]));
+  const bizName = (id: string | null) =>
+    id ? (businessById.get(id)?.name ?? "") : "";
   const nameById = new Map(
     input.profiles.map((p) => [p.id, p.full_name || "—"]),
   );
@@ -60,6 +65,8 @@ export async function buildRecordsWorkbook(
     views: [{ state: "frozen", ySplit: 1 }],
   });
   records.columns = [
+    { header: "Business", key: "business", width: 12 },
+    { header: "Business GSTIN", key: "business_gstin", width: 18 },
     { header: "Record type", key: "record_type", width: 12 },
     { header: "Status", key: "status", width: 11 },
     { header: "Invoice number", key: "invoice_number", width: 18 },
@@ -91,6 +98,10 @@ export async function buildRecordsWorkbook(
     const v = e.vendor_id ? vendorById.get(e.vendor_id) : undefined;
     const c = e.category_id ? categoryById.get(e.category_id) : undefined;
     records.addRow({
+      business: bizName(e.business_id),
+      business_gstin: e.business_id
+        ? (businessById.get(e.business_id)?.gstin ?? "")
+        : "",
       record_type: RECORD_TYPE_LABELS[e.record_type] ?? e.record_type,
       status: e.status,
       invoice_number: e.invoice_number ?? "",
@@ -125,6 +136,7 @@ export async function buildRecordsWorkbook(
     views: [{ state: "frozen", ySplit: 1 }],
   });
   lines.columns = [
+    { header: "Business", key: "business", width: 12 },
     { header: "Record type", key: "record_type", width: 12 },
     { header: "Invoice number", key: "invoice_number", width: 18 },
     { header: "Vendor", key: "vendor", width: 26 },
@@ -147,6 +159,7 @@ export async function buildRecordsWorkbook(
     const e = expenseById.get(li.expense_id);
     const v = e?.vendor_id ? vendorById.get(e.vendor_id) : undefined;
     lines.addRow({
+      business: bizName(e?.business_id ?? null),
       record_type: e ? (RECORD_TYPE_LABELS[e.record_type] ?? e.record_type) : "",
       invoice_number: e?.invoice_number ?? "",
       vendor: v?.name ?? "",
@@ -168,6 +181,7 @@ export async function buildRecordsWorkbook(
     views: [{ state: "frozen", ySplit: 1 }],
   });
   tax.columns = [
+    { header: "Business", key: "business", width: 12 },
     { header: "Record type", key: "record_type", width: 12 },
     { header: "Invoice number", key: "invoice_number", width: 18 },
     { header: "Vendor", key: "vendor", width: 26 },
@@ -185,6 +199,7 @@ export async function buildRecordsWorkbook(
     const e = expenseById.get(t.expense_id);
     const v = e?.vendor_id ? vendorById.get(e.vendor_id) : undefined;
     tax.addRow({
+      business: bizName(e?.business_id ?? null),
       record_type: e ? (RECORD_TYPE_LABELS[e.record_type] ?? e.record_type) : "",
       invoice_number: e?.invoice_number ?? "",
       vendor: v?.name ?? "",
@@ -203,6 +218,7 @@ export async function buildRecordsWorkbook(
     views: [{ state: "frozen", ySplit: 1 }],
   });
   custom.columns = [
+    { header: "Business", key: "business", width: 12 },
     { header: "Record type", key: "record_type", width: 14 },
     { header: "Invoice number", key: "invoice_number", width: 18 },
     { header: "Vendor", key: "vendor", width: 26 },
@@ -215,6 +231,7 @@ export async function buildRecordsWorkbook(
     const v = e.vendor_id ? vendorById.get(e.vendor_id) : undefined;
     for (const f of e.custom_fields ?? []) {
       custom.addRow({
+        business: bizName(e.business_id),
         record_type: RECORD_TYPE_LABELS[e.record_type] ?? e.record_type,
         invoice_number: e.invoice_number ?? "",
         vendor: v?.name ?? "",

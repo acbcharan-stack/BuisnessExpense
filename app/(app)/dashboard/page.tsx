@@ -3,7 +3,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { Card, Icon } from "@/components/ui";
+import { BusinessTabs } from "@/components/business-tabs";
 import { APP_NAME } from "@/lib/constants";
+import { isUuid } from "@/lib/uuid";
 import { financialYearOf } from "@/lib/tax/fy";
 
 export const metadata: Metadata = { title: `Dashboard · ${APP_NAME}` };
@@ -16,10 +18,23 @@ const isoDate = (d: Date) =>
   ).padStart(2, "0")}`;
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ business?: string }>;
+}) {
+  const { business = "" } = await searchParams;
   const supabase = await createClient();
   const now = new Date();
   const fy = financialYearOf(now);
+
+  // Apply the ?business= filter to any expenses query.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const byBiz = <T extends { eq: any; is: any }>(q: T): T => {
+    if (business === "unassigned") return q.is("business_id", null);
+    if (isUuid(business)) return q.eq("business_id", business);
+    return q;
+  };
 
   const quarters = [0, 1, 2, 3].map((i) => {
     const start = new Date(fy.startYear, 3 + i * 3, 1);
@@ -41,30 +56,46 @@ export default async function DashboardPage() {
     { count: expenseCount },
     { data: rows },
     { data: valueRows },
+    { data: businesses },
   ] = await Promise.all([
+    byBiz(
+      supabase
+        .from("expenses")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "review"),
+    ),
+    byBiz(supabase.from("expenses").select("id", { count: "exact", head: true })),
+    byBiz(
+      supabase
+        .from("expenses")
+        .select("id", { count: "exact", head: true })
+        .eq("record_type", "invoice"),
+    ),
+    byBiz(
+      supabase
+        .from("expenses")
+        .select("id", { count: "exact", head: true })
+        .eq("record_type", "expense"),
+    ),
+    byBiz(
+      supabase
+        .from("expenses")
+        .select("invoice_date, amount_inr, total, currency")
+        .in("status", ["confirmed", "exported"])
+        .gte("invoice_date", isoDate(fy.start))
+        .lt("invoice_date", isoDate(fy.end)),
+    ),
+    byBiz(
+      supabase
+        .from("expenses")
+        .select("record_type, amount_inr, total, currency")
+        .in("status", ["confirmed", "exported"]),
+    ),
     supabase
-      .from("expenses")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "review"),
-    supabase.from("expenses").select("id", { count: "exact", head: true }),
-    supabase
-      .from("expenses")
-      .select("id", { count: "exact", head: true })
-      .eq("record_type", "invoice"),
-    supabase
-      .from("expenses")
-      .select("id", { count: "exact", head: true })
-      .eq("record_type", "expense"),
-    supabase
-      .from("expenses")
-      .select("invoice_date, amount_inr, total, currency")
-      .in("status", ["confirmed", "exported"])
-      .gte("invoice_date", isoDate(fy.start))
-      .lt("invoice_date", isoDate(fy.end)),
-    supabase
-      .from("expenses")
-      .select("record_type, amount_inr, total, currency")
-      .in("status", ["confirmed", "exported"]),
+      .from("businesses")
+      .select("id, name")
+      .eq("is_archived", false)
+      .order("sort", { ascending: true }),
   ]);
 
   for (const r of rows ?? []) {
@@ -78,7 +109,6 @@ export default async function DashboardPage() {
   const fyTotal = quarters.reduce((s, q) => s + q.total, 0);
   const qMax = Math.max(1, ...quarters.map((q) => q.total));
 
-  // All-time confirmed spend value, split by type (for the tile sub-lines).
   let poValue = 0;
   let expValue = 0;
   for (const r of valueRows ?? []) {
@@ -94,6 +124,10 @@ export default async function DashboardPage() {
         title="Dashboard"
         description="Spend overview and what needs your attention."
       />
+
+      {(businesses?.length ?? 0) > 0 && (
+        <BusinessTabs businesses={businesses ?? []} />
+      )}
 
       {(pendingReview ?? 0) > 0 && (
         <Link
@@ -142,9 +176,7 @@ export default async function DashboardPage() {
           {quarters.map((q) => (
             <Card
               key={q.key}
-              className={`p-4 ${
-                q.current ? "ring-2 ring-blue-500/40" : ""
-              }`}
+              className={`p-4 ${q.current ? "ring-2 ring-blue-500/40" : ""}`}
             >
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">

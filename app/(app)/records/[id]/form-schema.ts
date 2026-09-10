@@ -48,6 +48,10 @@ export const customFieldSchema = z.object({
 
 export const recordFormSchema = z.object({
   record_type: z.enum(RECORD_TYPES),
+  business_id: z
+    .union([z.string(), z.null()])
+    .nullish()
+    .transform((v) => (v == null || v === "" ? null : v)),
   vendor_name: trimmedOrNull,
   category_id: z
     .union([z.string(), z.null()])

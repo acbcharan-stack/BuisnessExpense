@@ -12,14 +12,20 @@ export default async function NewRecordPage() {
   const profile = await requireProfile();
   const supabase = await createClient();
 
-  const [{ data: categories }, { data: vendors }] = await Promise.all([
-    supabase
-      .from("categories")
-      .select("id, name, default_record_type")
-      .eq("is_archived", false)
-      .order("name", { ascending: true }),
-    supabase.from("vendors").select("id, name").order("name").limit(500),
-  ]);
+  const [{ data: categories }, { data: businesses }, { data: vendors }] =
+    await Promise.all([
+      supabase
+        .from("categories")
+        .select("id, name, default_record_type")
+        .eq("is_archived", false)
+        .order("name", { ascending: true }),
+      supabase
+        .from("businesses")
+        .select("id, name")
+        .eq("is_archived", false)
+        .order("sort", { ascending: true }),
+      supabase.from("vendors").select("id, name").order("name").limit(500),
+    ]);
 
   const data: ReviewFormData = {
     expenseId: "",
@@ -34,10 +40,12 @@ export default async function NewRecordPage() {
       downloadUrl: null,
     },
     categories: categories ?? [],
+    businesses: businesses ?? [],
     vendors: vendors ?? [],
     confidence: null,
     initial: {
       record_type: "expense",
+      business_id: "",
       vendor_name: "",
       category_id: "",
       new_category_name: "",

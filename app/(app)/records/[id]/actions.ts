@@ -6,11 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireProfile, assertRole } from "@/lib/supabase/auth";
 import { normalizeVendorName } from "@/lib/extraction/match";
 import { removeDocumentObject } from "@/lib/supabase/storage";
+import { UUID_RE } from "@/lib/uuid";
 import type { CustomField, ProfileRow } from "@/lib/supabase/database.types";
-
-/** Reject anything that isn't a v4-shaped UUID before it reaches the DB. */
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import {
   recordFormSchema,
   type RecordFormValues,
@@ -30,6 +27,20 @@ function cleanCustomFields(rows: RecordFormParsed["custom_fields"]): CustomField
   return rows
     .filter((r) => r.label)
     .map((r) => ({ label: r.label as string, value: r.value ?? "" }));
+}
+
+/** null, or a UUID that actually exists in `businesses` (defensive). */
+async function resolveBusinessId(
+  admin: Admin,
+  raw: string | null,
+): Promise<string | null> {
+  if (!raw || !UUID_RE.test(raw)) return null;
+  const { data } = await admin
+    .from("businesses")
+    .select("id")
+    .eq("id", raw)
+    .maybeSingle();
+  return data?.id ?? null;
 }
 
 async function resolveCategoryId(
@@ -141,12 +152,14 @@ export async function saveRecord(
 
   const categoryId = await resolveCategoryId(admin, v);
   const vendorId = await resolveVendorId(admin, profile, v, current.vendor_id);
+  const businessId = await resolveBusinessId(admin, v.business_id);
   const amountInr = v.currency === "INR" ? v.total : current.amount_inr;
 
   const { error: updErr } = await supabase
     .from("expenses")
     .update({
       record_type: v.record_type,
+      business_id: businessId,
       vendor_id: vendorId,
       category_id: categoryId,
       category_set_by: profile.id,
@@ -209,12 +222,14 @@ export async function createManualRecord(
 
   const categoryId = await resolveCategoryId(admin, v);
   const vendorId = await resolveVendorId(admin, profile, v, null);
+  const businessId = await resolveBusinessId(admin, v.business_id);
 
   const { data: created, error } = await supabase
     .from("expenses")
     .insert({
       document_id: null,
       record_type: v.record_type,
+      business_id: businessId,
       vendor_id: vendorId,
       category_id: categoryId,
       category_set_by: profile.id,

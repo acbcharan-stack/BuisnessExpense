@@ -28,10 +28,12 @@ export interface ReviewFormData {
     name: string;
     default_record_type: "invoice" | "expense";
   }[];
+  businesses: { id: string; name: string }[];
   vendors: { id: string; name: string }[];
   confidence: number | null;
   initial: {
     record_type: RecordType;
+    business_id: string;
     vendor_name: string;
     category_id: string;
     new_category_name: string;
@@ -82,6 +84,7 @@ interface CustomFieldState {
 }
 interface FormState {
   record_type: RecordType;
+  business_id: string;
   vendor_name: string;
   category_id: string;
   new_category_name: string;
@@ -161,6 +164,7 @@ const emptyCustom: CustomFieldState = { label: "", value: "" };
 function buildInitial(d: ReviewFormData["initial"]): FormState {
   return {
     record_type: d.record_type,
+    business_id: d.business_id,
     vendor_name: d.vendor_name,
     category_id: d.category_id,
     new_category_name: d.new_category_name,
@@ -242,6 +246,7 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
   const values: RecordFormValues = useMemo(
     () => ({
       record_type: form.record_type,
+      business_id: form.business_id || null,
       vendor_name: form.vendor_name,
       category_id: form.category_id || null,
       new_category_name: form.new_category_name,
@@ -422,27 +427,48 @@ export function ReviewForm({ data }: { data: ReviewFormData }) {
           )}
         </div>
 
-        {/* Record type toggle */}
-        <div>
-          <span className="mb-1 block text-xs font-medium text-zinc-500">
-            Record type
-          </span>
-          <div className="inline-flex rounded-lg border border-zinc-300 p-0.5 dark:border-zinc-700">
-            {RECORD_TYPES.map((rt) => (
-              <button
-                key={rt}
-                type="button"
-                disabled={readOnly}
-                onClick={() => set("record_type", rt)}
-                className={`rounded-md px-3.5 py-1.5 text-sm transition active:scale-[.97] ${
-                  form.record_type === rt
-                    ? "bg-blue-600 text-white dark:bg-blue-500"
-                    : "text-zinc-600 disabled:opacity-60 dark:text-zinc-300"
-                }`}
-              >
-                {RECORD_TYPE_LABELS[rt]}
-              </button>
-            ))}
+        {/* Record type toggle + business */}
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <span className="mb-1 block text-xs font-medium text-zinc-500">
+              Record type
+            </span>
+            <div className="inline-flex rounded-lg border border-zinc-300 p-0.5 dark:border-zinc-700">
+              {RECORD_TYPES.map((rt) => (
+                <button
+                  key={rt}
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => set("record_type", rt)}
+                  className={`rounded-md px-3.5 py-1.5 text-sm transition active:scale-[.97] ${
+                    form.record_type === rt
+                      ? "bg-blue-600 text-white dark:bg-blue-500"
+                      : "text-zinc-600 disabled:opacity-60 dark:text-zinc-300"
+                  }`}
+                >
+                  {RECORD_TYPE_LABELS[rt]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="min-w-[10rem] flex-1">
+            <span className="mb-1 block text-xs font-medium text-zinc-500">
+              Business
+            </span>
+            <select
+              className={inputCls}
+              value={form.business_id}
+              disabled={readOnly}
+              onChange={(e) => set("business_id", e.target.value)}
+            >
+              <option value="">— unassigned —</option>
+              {data.businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

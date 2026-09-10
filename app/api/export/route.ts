@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildRecordsWorkbook } from "@/lib/export/records-workbook";
 import { APP_SLUG } from "@/lib/constants";
+import { UUID_RE, isUuid } from "@/lib/uuid";
 import type {
   ExpenseLineItemRow,
   ExpenseTaxRow,
@@ -42,19 +43,14 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   const idParam = params.get("id");
-  const singleId =
-    idParam &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      idParam,
-    )
-      ? idParam
-      : null;
+  const singleId = idParam && UUID_RE.test(idParam) ? idParam : null;
   if (idParam && !singleId) {
     return NextResponse.json({ error: "Invalid record id." }, { status: 400 });
   }
   const typeParam = params.get("type");
   const recordType =
     typeParam === "invoice" || typeParam === "expense" ? typeParam : null;
+  const businessParam = params.get("business") ?? "";
 
   // Bulk export is manager-only; a single record can be exported by anyone
   // who can already open it.
@@ -79,8 +75,14 @@ export async function GET(request: Request) {
     .select("*")
     .order("invoice_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
-  if (singleId) query = query.eq("id", singleId);
-  else if (recordType) query = query.eq("record_type", recordType);
+  if (singleId) {
+    query = query.eq("id", singleId);
+  } else {
+    if (recordType) query = query.eq("record_type", recordType);
+    if (businessParam === "unassigned") query = query.is("business_id", null);
+    else if (isUuid(businessParam))
+      query = query.eq("business_id", businessParam);
+  }
 
   const { data: expenses, error } = await query;
   if (error) {
@@ -103,29 +105,31 @@ export async function GET(request: Request) {
     ),
   ] as string[];
 
-  const [lineItems, taxes, vendors, categories, profiles] = await Promise.all([
-    ids.length
-      ? fetchChildren<ExpenseLineItemRow>(admin, "expense_line_items", ids)
-      : Promise.resolve([]),
-    ids.length
-      ? fetchChildren<ExpenseTaxRow>(admin, "expense_taxes", ids)
-      : Promise.resolve([]),
-    vendorIds.length
-      ? admin
-          .from("vendors")
-          .select("id, name, tax_id, tax_id_type, country")
-          .in("id", vendorIds)
-      : Promise.resolve({ data: [] }),
-    categoryIds.length
-      ? admin
-          .from("categories")
-          .select("id, name, zoho_account_name")
-          .in("id", categoryIds)
-      : Promise.resolve({ data: [] }),
-    profileIds.length
-      ? admin.from("profiles").select("id, full_name").in("id", profileIds)
-      : Promise.resolve({ data: [] }),
-  ]);
+  const [lineItems, taxes, vendors, categories, businesses, profiles] =
+    await Promise.all([
+      ids.length
+        ? fetchChildren<ExpenseLineItemRow>(admin, "expense_line_items", ids)
+        : Promise.resolve([]),
+      ids.length
+        ? fetchChildren<ExpenseTaxRow>(admin, "expense_taxes", ids)
+        : Promise.resolve([]),
+      vendorIds.length
+        ? admin
+            .from("vendors")
+            .select("id, name, tax_id, tax_id_type, country")
+            .in("id", vendorIds)
+        : Promise.resolve({ data: [] }),
+      categoryIds.length
+        ? admin
+            .from("categories")
+            .select("id, name, zoho_account_name")
+            .in("id", categoryIds)
+        : Promise.resolve({ data: [] }),
+      admin.from("businesses").select("id, name, gstin"),
+      profileIds.length
+        ? admin.from("profiles").select("id, full_name").in("id", profileIds)
+        : Promise.resolve({ data: [] }),
+    ]);
 
   const buffer = await buildRecordsWorkbook({
     expenses: rows,
@@ -133,6 +137,7 @@ export async function GET(request: Request) {
     taxes,
     vendors: vendors.data ?? [],
     categories: categories.data ?? [],
+    businesses: businesses.data ?? [],
     profiles: profiles.data ?? [],
   });
 

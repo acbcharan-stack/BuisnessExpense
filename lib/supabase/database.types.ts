@@ -47,6 +47,19 @@ export type ProfileRow = {
   updated_at: string;
 };
 
+export type BusinessRow = {
+  id: string;
+  name: string;
+  legal_name: string | null;
+  gstin: string | null;
+  gst_state_code: string | null;
+  address: string | null;
+  is_archived: boolean;
+  sort: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type CategoryRow = {
   id: string;
   name: string;
@@ -106,6 +119,7 @@ export type CustomField = { label: string; value: string };
 export type ExpenseRow = {
   id: string;
   document_id: string | null;
+  business_id: string | null;
   vendor_id: string | null;
   category_id: string | null;
   record_type: RecordTypeDb;
@@ -174,6 +188,7 @@ export type Database = {
   public: {
     Tables: {
       profiles: TableShape<ProfileRow>;
+      businesses: TableShape<BusinessRow>;
       categories: TableShape<CategoryRow>;
       vendors: TableShape<VendorRow>;
       documents: TableShape<DocumentRow>;

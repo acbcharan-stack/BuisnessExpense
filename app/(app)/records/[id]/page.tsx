@@ -33,6 +33,7 @@ export default async function RecordReviewPage({
     { data: lineItems },
     { data: taxes },
     { data: categories },
+    { data: businesses },
     { data: vendors },
     { data: job },
   ] = await Promise.all([
@@ -54,6 +55,11 @@ export default async function RecordReviewPage({
       .select("id, name, default_record_type")
       .eq("is_archived", false)
       .order("name", { ascending: true }),
+    supabase
+      .from("businesses")
+      .select("id, name")
+      .eq("is_archived", false)
+      .order("sort", { ascending: true }),
     supabase.from("vendors").select("id, name").order("name").limit(500),
     expense.document_id
       ? supabase
@@ -98,10 +104,12 @@ export default async function RecordReviewPage({
       downloadUrl,
     },
     categories: categories ?? [],
+    businesses: businesses ?? [],
     vendors: vendors ?? [],
     confidence,
     initial: {
       record_type: expense.record_type,
+      business_id: expense.business_id ?? "",
       vendor_name: currentVendor?.name ?? "",
       category_id: expense.category_id ?? "",
       new_category_name: "",
