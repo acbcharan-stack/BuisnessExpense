@@ -67,11 +67,15 @@ export function domesticGstSplit(
   return supplierState === homeStateCode ? "cgst_sgst" : "igst";
 }
 
+/** GST components a registered buyer can claim back as input tax credit. */
+export const ITC_TAX_TYPES = ["CGST", "SGST", "IGST", "CESS"] as const;
+
 /** Sum of input-tax-credit-eligible GST for a set of tax lines. */
 export function itcEligibleAmount(
   taxLines: { tax_type: string; amount: number }[],
 ): number {
+  const eligible = new Set<string>(ITC_TAX_TYPES);
   return taxLines
-    .filter((t) => ["CGST", "SGST", "IGST", "CESS"].includes(t.tax_type))
+    .filter((t) => eligible.has(t.tax_type))
     .reduce((acc, t) => acc + (Number.isFinite(t.amount) ? t.amount : 0), 0);
 }

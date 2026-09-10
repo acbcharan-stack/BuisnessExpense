@@ -14,9 +14,13 @@ before committing. See project memory `security-standards.md`.
 - [x] 2. List filters — date range, category, vendor, status, country, text search
 - [x] 3. CSV export — plain-CSV option alongside the existing .xlsx, same filters
 - [ ] 4. Zoho Books CSV — export in Zoho's Bills/Expenses import layout
-- [ ] 5. Settings editor — make the category -> Zoho-account mapping table editable
-- [ ] 6. Dashboard tax tile — ITC-eligible GST per quarter and full FY
-- [ ] 7. Dashboard toggle — All / Purchase Orders / Expenses
+      **(deferred — user: "we will do this later"; needs their real Zoho import
+      template header row. Decided: Bills format for POs, Expenses format for
+      expenses.)**
+- [ ] 5. Settings editor — make the category -> Zoho-account mapping table
+      editable **(deferred with item 4 — it feeds the Zoho export)**
+- [x] 6. Dashboard tax tile — ITC-eligible GST per quarter and full FY
+- [x] 7. Dashboard toggle — All / Purchase Orders / Expenses
 - [ ] 8. Dashboard charts — monthly trend line, category donut, top-vendors bar
 
 ## What was already done before Phase 3 work started
@@ -135,5 +139,31 @@ Security choices, plainly:
 - **Export obeys the same gate + the same validation as the list.** Bulk export
   is still owner/accountant only; the forwarded filters go through the exact
   `parseRecordFilters` the tables use.
+
+Checks: `typecheck`, `lint`, `test` (45), `build` all pass.
+
+### 2026-09-10 — Items 6 + 7: dashboard ITC tile + record-type toggle
+
+- `lib/tax/gst.ts` — exported `ITC_TAX_TYPES` (`CGST/SGST/IGST/CESS`), reused by
+  `itcEligibleAmount` and the dashboard.
+- `dashboard/page.tsx` — new **"GST input tax credit"** section: same 4-quarter
+  card layout as Spend, plus an FY total. Sums `expense_taxes.amount` for the
+  ITC types on this FY's confirmed/exported **domestic** (`country` = IN) records,
+  bucketed by quarter. Records are date-bucketed once (`quarterOfExpense` map)
+  and reused; `expense_taxes` fetched in 200-id chunks with a `tax_type` filter.
+- `components/record-view-tabs.tsx` (new) — All / Purchase orders / Expenses
+  segmented control on `?view=` (`invoice` | `expense` | absent), preserves
+  other params, `prefetch`.
+- `dashboard/page.tsx` — `byView()` helper (mirrors `byBiz()`); applied to the
+  Awaiting-review + Records-captured counts and the spend/ITC roll-up. The
+  PO-vs-Expense split tiles stay global on purpose.
+
+Security choices, plainly:
+- **`?view=` is checked against a fixed list.** Only `invoice` / `expense` do
+  anything; any other value falls back to "all", so the URL can't smuggle a
+  different column or value into the query.
+- **The tax figure only trusts its own maths.** Amounts are coerced with
+  `Number()` and skipped unless finite, and only the four creditable GST types
+  are counted.
 
 Checks: `typecheck`, `lint`, `test` (45), `build` all pass.
