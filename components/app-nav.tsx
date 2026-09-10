@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/app/(auth)/login/actions";
@@ -84,6 +84,17 @@ function UserFooter({ name, role }: { name: string; role: string }) {
 export function AppNav({ name, role }: { name: string; role: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+
+  // Lock the page behind the drawer while it's open.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   return (
     <>
@@ -98,7 +109,7 @@ export function AppNav({ name, role }: { name: string; role: string }) {
         </div>
       </aside>
 
-      {/* Mobile: top bar + collapsible vertical menu */}
+      {/* Mobile: top bar */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-zinc-200 bg-white/85 px-4 py-2.5 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/85 lg:hidden">
         <Brand />
         <button
@@ -112,22 +123,38 @@ export function AppNav({ name, role }: { name: string; role: string }) {
         </button>
       </header>
 
-      {open && (
-        <div className="lg:hidden">
-          <button
-            type="button"
-            aria-label="Close menu"
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 z-20 bg-black/20"
-          />
-          <div className="fixed inset-x-0 top-[53px] z-30 border-b border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
-            <NavLinks pathname={pathname} onNavigate={() => setOpen(false)} />
-            <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-              <UserFooter name={name} role={role} />
-            </div>
+      {/* Mobile: left slide-in drawer (always mounted, animated) */}
+      <div className="lg:hidden" aria-hidden={!open}>
+        <div
+          onClick={close}
+          className={`fixed inset-0 z-40 bg-black/35 transition-opacity duration-200 ${
+            open ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+        />
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 flex w-64 max-w-[82vw] flex-col border-r border-zinc-200 bg-white p-4 shadow-xl transition-transform duration-200 ease-out dark:border-zinc-800 dark:bg-zinc-950 ${
+            open ? "translate-x-0" : "pointer-events-none -translate-x-full"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <Brand />
+            <button
+              type="button"
+              onClick={close}
+              aria-label="Close menu"
+              className="rounded-lg p-1.5 text-zinc-500 transition hover:bg-zinc-100 active:scale-95 dark:hover:bg-zinc-800"
+            >
+              <Icon name="x" className="size-5" />
+            </button>
           </div>
-        </div>
-      )}
+          <div className="mt-6 flex-1 overflow-y-auto">
+            <NavLinks pathname={pathname} onNavigate={close} />
+          </div>
+          <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
+            <UserFooter name={name} role={role} />
+          </div>
+        </aside>
+      </div>
     </>
   );
 }
