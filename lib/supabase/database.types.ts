@@ -39,6 +39,8 @@ export type TaxTypeDb =
   | "GST"
   | "SALES_TAX"
   | "OTHER";
+export type InvoiceDirectionDb = "purchase" | "sale";
+export type GeneratedInvoiceStatusDb = "draft" | "confirmed" | "void";
 
 export type ProfileRow = {
   id: string;
@@ -55,6 +57,14 @@ export type BusinessRow = {
   gstin: string | null;
   gst_state_code: string | null;
   address: string | null;
+  bank_account_name: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_name: string | null;
+  signature_storage_path: string | null;
+  logo_storage_path: string | null;
+  invoice_prefix: string | null;
+  terms_and_conditions: string | null;
   is_archived: boolean;
   sort: number;
   created_at: string;
@@ -168,6 +178,84 @@ export type ExpenseTaxRow = {
   jurisdiction: string | null;
 };
 
+/** Frozen snapshot of the counterparty (vendor or customer) on a generated invoice. */
+export type CounterpartySnapshot = {
+  name: string;
+  tax_id: string | null;
+  tax_id_type: TaxIdTypeDb | null;
+  address: string | null;
+  country: string;
+};
+
+/** Frozen snapshot of the issuing business's letterhead data at generation time. */
+export type OurBusinessSnapshot = {
+  name: string;
+  legal_name: string | null;
+  gstin: string | null;
+  gst_state_code: string | null;
+  address: string | null;
+  bank_account_name: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_name: string | null;
+  signature_storage_path: string | null;
+  logo_storage_path: string | null;
+  terms_and_conditions: string | null;
+};
+
+export type InvoiceNumberCounterRow = {
+  business_id: string;
+  direction: InvoiceDirectionDb;
+  fy_label: string;
+  next_seq: number;
+};
+
+export type GeneratedInvoiceRow = {
+  id: string;
+  source_expense_id: string;
+  direction: InvoiceDirectionDb;
+  status: GeneratedInvoiceStatusDb;
+  business_id: string;
+  counterparty: CounterpartySnapshot;
+  our_business: OurBusinessSnapshot;
+  our_invoice_number: string | null;
+  our_invoice_date: string | null;
+  fy_label: string | null;
+  currency: string;
+  subtotal: number | null;
+  tax_total: number | null;
+  total: number | null;
+  notes: string | null;
+  pdf_storage_path: string | null;
+  pdf_generated_at: string | null;
+  created_by: string | null;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GeneratedInvoiceLineItemRow = {
+  id: string;
+  generated_invoice_id: string;
+  line_no: number | null;
+  description: string | null;
+  hsn_sac: string | null;
+  quantity: number | null;
+  unit_price: number | null;
+  amount: number | null;
+  tax_rate: number | null;
+};
+
+export type GeneratedInvoiceTaxRow = {
+  id: string;
+  generated_invoice_id: string;
+  tax_type: TaxTypeDb;
+  rate: number | null;
+  amount: number;
+  jurisdiction: string | null;
+};
+
 export type AuditLogRow = {
   id: number;
   actor_id: string | null;
@@ -197,6 +285,10 @@ export type Database = {
       expenses: TableShape<ExpenseRow>;
       expense_line_items: TableShape<ExpenseLineItemRow>;
       expense_taxes: TableShape<ExpenseTaxRow>;
+      generated_invoices: TableShape<GeneratedInvoiceRow>;
+      generated_invoice_line_items: TableShape<GeneratedInvoiceLineItemRow>;
+      generated_invoice_taxes: TableShape<GeneratedInvoiceTaxRow>;
+      invoice_number_counters: TableShape<InvoiceNumberCounterRow>;
       audit_log: TableShape<AuditLogRow>;
     };
     Views: Record<string, never>;
@@ -207,6 +299,14 @@ export type Database = {
       };
       can_write: { Args: Record<PropertyKey, never>; Returns: boolean };
       can_manage: { Args: Record<PropertyKey, never>; Returns: boolean };
+      allocate_invoice_seq: {
+        Args: {
+          p_business_id: string;
+          p_direction: InvoiceDirectionDb;
+          p_fy_label: string;
+        };
+        Returns: number;
+      };
     };
     Enums: {
       user_role: UserRoleDb;

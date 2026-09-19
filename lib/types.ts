@@ -72,3 +72,20 @@ export const TAX_TYPES = [
   "OTHER",
 ] as const;
 export type TaxType = (typeof TAX_TYPES)[number];
+
+/**
+ * A Purchase Order record (the supplier's document) is converted into OUR
+ * invoice agreeing to the supplier's price: our letterhead, logo, signature
+ * and bank details, with the supplier shown as the vendor. The UI only ever
+ * creates "purchase"; "sale" stays in the DB check constraint (migration
+ * 0005) so no schema change is needed.
+ */
+export const INVOICE_DIRECTIONS = ["purchase", "sale"] as const;
+export type InvoiceDirection = (typeof INVOICE_DIRECTIONS)[number];
+export const INVOICE_DIRECTION_LABELS: Record<InvoiceDirection, string> = {
+  purchase: "Purchase Invoice",
+  sale: "Sale Invoice",
+};
+
+export const GENERATED_INVOICE_STATUSES = ["draft", "confirmed", "void"] as const;
+export type GeneratedInvoiceStatus = (typeof GENERATED_INVOICE_STATUSES)[number];

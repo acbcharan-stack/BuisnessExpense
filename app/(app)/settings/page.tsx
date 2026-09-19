@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/supabase/auth";
+import { createSignedDocumentUrl } from "@/lib/supabase/storage";
 import { PageHeader } from "@/components/page-header";
 import { Badge, Card } from "@/components/ui";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, ASSET_BUCKET } from "@/lib/constants";
 import { BusinessesEditor } from "./businesses-editor";
 
 export const metadata: Metadata = { title: `Settings · ${APP_NAME}` };
@@ -24,10 +25,22 @@ export default async function SettingsPage() {
       supabase.from("profiles").select("full_name, role").order("role"),
       supabase
         .from("businesses")
-        .select("id, name, legal_name, gstin, gst_state_code, address")
+        .select("*")
         .eq("is_archived", false)
         .order("sort", { ascending: true }),
     ]);
+
+  const businessesWithAssetUrls = await Promise.all(
+    (businesses ?? []).map(async (b) => ({
+      ...b,
+      signatureUrl: b.signature_storage_path
+        ? await createSignedDocumentUrl(supabase, b.signature_storage_path, 3600, false, ASSET_BUCKET)
+        : null,
+      logoUrl: b.logo_storage_path
+        ? await createSignedDocumentUrl(supabase, b.logo_storage_path, 3600, false, ASSET_BUCKET)
+        : null,
+    })),
+  );
 
   return (
     <>
@@ -44,7 +57,7 @@ export default async function SettingsPage() {
           </span>
         </h2>
         <BusinessesEditor
-          businesses={businesses ?? []}
+          businesses={businessesWithAssetUrls}
           canManage={canManage}
         />
         <p className="mt-2 text-xs text-zinc-500">

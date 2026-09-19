@@ -45,3 +45,7 @@ export const ACCEPTED_MIME_TYPES = [
 ] as const;
 
 export const STORAGE_BUCKET = "documents";
+/** Durable per-business branding assets (signatures, logos) — not scanned documents. */
+export const ASSET_BUCKET = "business-assets";
+/** Rendered PDFs produced by the purchase-order-to-invoice conversion flow. */
+export const GENERATED_INVOICE_BUCKET = "generated-invoices";

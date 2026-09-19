@@ -4,7 +4,7 @@ import { RECORD_TYPES, TAX_TYPES } from "@/lib/types";
 /** public.expenses money columns are numeric(14,2). */
 const MONEY_MAX = 999_999_999_999.99;
 
-const money = z
+export const money = z
   .union([z.number(), z.string(), z.null()])
   .transform((v) => {
     if (v === null || v === undefined || v === "") return null;
@@ -15,11 +15,11 @@ const money = z
     message: "Amount is out of range.",
   });
 
-const trimmedOrNull = z
+export const trimmedOrNull = z
   .union([z.string(), z.null()])
   .transform((v) => (v == null || v.trim() === "" ? null : v.trim()));
 
-const isoDateOrNull = trimmedOrNull.refine(
+export const isoDateOrNull = trimmedOrNull.refine(
   (v) => v === null || /^\d{4}-\d{2}-\d{2}$/.test(v),
   "Dates must be YYYY-MM-DD",
 );

@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/supabase/auth";
 import { createSignedDocumentUrl } from "@/lib/supabase/storage";
+import { GENERATED_INVOICE_BUCKET } from "@/lib/constants";
 import { PageHeader } from "@/components/page-header";
 import { ExportButton } from "@/components/export-button";
 import { DeleteRecordButton } from "@/components/delete-record-button";
+import { Button } from "@/components/ui";
 import { APP_NAME } from "@/lib/constants";
 import { ReviewForm, type ReviewFormData } from "./review-form";
 
@@ -36,6 +39,7 @@ export default async function RecordReviewPage({
     { data: businesses },
     { data: vendors },
     { data: job },
+    { data: generatedInvoice },
   ] = await Promise.all([
     expense.document_id
       ? supabase
@@ -70,7 +74,26 @@ export default async function RecordReviewPage({
           .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    expense.record_type === "invoice"
+      ? supabase
+          .from("generated_invoices")
+          .select("id, status, direction, our_invoice_number, pdf_storage_path")
+          .eq("source_expense_id", id)
+          .neq("status", "void")
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
+
+  const generatedInvoicePdfUrl =
+    generatedInvoice?.status === "confirmed" && generatedInvoice.pdf_storage_path
+      ? await createSignedDocumentUrl(
+          supabase,
+          generatedInvoice.pdf_storage_path,
+          3600,
+          false,
+          GENERATED_INVOICE_BUCKET,
+        )
+      : null;
 
   const [signedUrl, downloadUrl] = document?.storage_path
     ? await Promise.all([
@@ -154,6 +177,13 @@ export default async function RecordReviewPage({
         }
         action={
           <div className="flex flex-wrap items-center gap-2">
+            {expense.record_type === "invoice" && (
+              <Link href={`/records/${expense.id}/convert`}>
+                <Button variant="secondary" size="sm" icon="invoice">
+                  {generatedInvoice ? "Edit generated invoice" : "Convert to Invoice"}
+                </Button>
+              </Link>
+            )}
             <ExportButton
               type="all"
               recordId={expense.id}
@@ -172,6 +202,25 @@ export default async function RecordReviewPage({
           </div>
         }
       />
+      {generatedInvoice?.status === "confirmed" && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm dark:border-emerald-900/60 dark:bg-emerald-950/30">
+          <span className="font-medium text-emerald-800 dark:text-emerald-300">
+            Generated invoice: {generatedInvoice.our_invoice_number}
+          </span>
+          <span className="text-emerald-700/80 dark:text-emerald-400/80">
+            ({generatedInvoice.direction === "purchase" ? "Purchase / Self-Invoice" : "Sale Invoice"})
+          </span>
+          {generatedInvoicePdfUrl && (
+            <a
+              href={generatedInvoicePdfUrl}
+              download
+              className="ml-auto font-medium text-blue-600 hover:underline dark:text-blue-400"
+            >
+              Download PDF
+            </a>
+          )}
+        </div>
+      )}
       <ReviewForm data={data} />
     </>
   );
