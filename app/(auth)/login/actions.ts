@@ -38,10 +38,30 @@ export async function sendPasswordReset(
   if (!email) return { error: "Enter your email first." };
 
   const supabase = await createClient();
-  await supabase.auth.resetPasswordForEmail(email, {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${publicEnv.siteUrl}/auth/reset`,
   });
-  // Always report success — don't reveal whether an address is registered.
+  if (error) {
+    // Never log the address itself; the code + status are enough to diagnose.
+    console.error("Password reset email failed:", error.status, error.code, error.message);
+
+    // These two say something about the email SERVICE, not about whether the
+    // address has an account, so they are safe to show and stop the person
+    // waiting for a mail that will never come.
+    if (error.code === "over_email_send_rate_limit") {
+      return {
+        error:
+          "Too many emails have been sent recently. Wait a while (up to an hour) and try again.",
+      };
+    }
+    if (error.code === "email_address_not_authorized") {
+      return {
+        error:
+          "The email service isn't allowed to send to this address yet. Ask the administrator to set up email sending (custom SMTP) in Supabase.",
+      };
+    }
+  }
+  // Otherwise always report success — don't reveal whether an address is registered.
   return {
     notice: "If that address has an account, a reset link is on its way.",
   };
