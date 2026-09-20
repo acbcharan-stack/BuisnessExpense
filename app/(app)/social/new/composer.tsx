@@ -32,6 +32,35 @@ interface Picked {
   state: FileState;
 }
 
+/** A refusal we want the person to read as-is (safe, plain-language text). */
+class UploadFailure extends Error {}
+
+/**
+ * Time allowed for one file: 2 minutes plus the time it would take at a very
+ * slow ~64 KB/s, capped at 20 minutes. Generous for real slow connections, but
+ * a stalled upload can't hang the page for ever.
+ */
+function uploadTimeoutMs(bytes: number): number {
+  const seconds = 120 + bytes / (64 * 1024);
+  return Math.min(seconds, 20 * 60) * 1000;
+}
+
+function withTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new UploadFailure(message)), ms);
+    work.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+
 const inputCls =
   "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-zinc-50 disabled:text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:disabled:bg-zinc-900";
 
@@ -45,6 +74,7 @@ export function PostComposer() {
   const [busy, setBusy] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
   // Free the in-browser preview addresses when the page is left.
   const pickedRef = useRef<Picked[]>([]);
@@ -113,59 +143,94 @@ export function PostComposer() {
     }
 
     setBusy(true);
+    setStatus("Getting ready…");
     setPicked((prev) => prev.map((p) => ({ ...p, state: "ready" })));
 
-    // 1. Ask the server for one upload slip per file.
-    const prep = await prepareSocialUpload({
-      files: picked.map((p) => ({ type: p.mime, size: p.file.size })),
-    });
-    if (!prep.ok) {
-      setError(prep.error);
-      setBusy(false);
-      return;
-    }
+    // Whatever goes wrong below — a refused step, a dropped connection, a
+    // stalled upload — we always land in `finally`, so the button can never
+    // be left spinning for ever.
+    let postId: string | null = null;
+    let published = false;
+    let failedKey: string | null = null;
+    try {
+      // 1. Ask the server for one upload slip per file.
+      const prep = await prepareSocialUpload({
+        files: picked.map((p) => ({ type: p.mime, size: p.file.size })),
+      });
+      if (!prep.ok) throw new UploadFailure(prep.error);
+      postId = prep.postId;
 
-    // 2. Send the files straight to storage (videos are too big to go through
-    //    the app server), one after the other.
-    const supabase = createClient();
-    for (let i = 0; i < picked.length; i++) {
-      const p = picked[i];
-      const slip = prep.uploads[i];
-      setState(p.key, "uploading");
-      const { error: upErr } = await supabase.storage
-        .from(SOCIAL_BUCKET)
-        .uploadToSignedUrl(slip.path, slip.token, p.file, { contentType: p.mime });
-      if (upErr) {
-        setState(p.key, "error");
-        setError(
-          `Upload of ${p.file.name} failed. Nothing was posted — please try again.`,
+      // 2. Send the files straight to storage (videos are too big to go through
+      //    the app server), one after the other.
+      const supabase = createClient();
+      for (let i = 0; i < picked.length; i++) {
+        const p = picked[i];
+        const slip = prep.uploads[i];
+        setState(p.key, "uploading");
+        setStatus(
+          `Uploading file ${i + 1} of ${picked.length} (${formatBytes(p.file.size)})` +
+            " — large videos can take a few minutes.",
         );
-        await abandonSocialUpload(prep.postId);
-        setBusy(false);
-        return;
+        // The storage library sends a picked file under the file's OWN type
+        // and ignores `contentType`; some browsers report "" for .mov/.mp4.
+        // Re-wrapping (no data is copied) makes the declared type stick.
+        const body = new Blob([p.file], { type: p.mime });
+        const { error: upErr } = await withTimeout(
+          supabase.storage
+            .from(SOCIAL_BUCKET)
+            .uploadToSignedUrl(slip.path, slip.token, body, {
+              contentType: p.mime,
+            }),
+          uploadTimeoutMs(p.file.size),
+          `Upload of ${p.file.name} took too long and was stopped. Check your connection and try again.`,
+        ).catch((err: unknown) => {
+          failedKey = p.key;
+          throw err;
+        });
+        if (upErr) {
+          failedKey = p.key;
+          throw new UploadFailure(
+            `Upload of ${p.file.name} failed. Nothing was posted — please try again.`,
+          );
+        }
+        setState(p.key, "done");
       }
-      setState(p.key, "done");
-    }
 
-    // 3. Publish the post.
-    const res = await publishSocialPost({
-      postId: prep.postId,
-      title,
-      caption,
-      files: prep.uploads.map((u, i) => ({
-        name: u.name,
-        original_name: picked[i].file.name,
-      })),
-    });
-    if (!res.ok || !res.id) {
-      setError(res.error ?? "Could not create the post.");
-      await abandonSocialUpload(prep.postId);
-      setPicked((prev) => prev.map((p) => ({ ...p, state: "ready" })));
-      setBusy(false);
-      return;
+      // 3. Publish the post.
+      setStatus("Publishing…");
+      const res = await publishSocialPost({
+        postId: prep.postId,
+        title,
+        caption,
+        files: prep.uploads.map((u, i) => ({
+          name: u.name,
+          original_name: picked[i].file.name,
+        })),
+      });
+      if (!res.ok || !res.id) {
+        throw new UploadFailure(res.error ?? "Could not create the post.");
+      }
+      published = true;
+      router.push(`/social/${res.id}`);
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof UploadFailure
+          ? err.message
+          : "Something went wrong and nothing was posted. Check your connection and try again.",
+      );
+    } finally {
+      if (!published) {
+        // Tidy any half-uploaded files (the server only ever removes a folder
+        // whose post does not exist), then hand the form back.
+        if (postId) await abandonSocialUpload(postId).catch(() => undefined);
+        setPicked((prev) =>
+          prev.map((p) => ({ ...p, state: p.key === failedKey ? "error" : "ready" })),
+        );
+        setStatus(null);
+        setBusy(false);
+      }
     }
-    router.push(`/social/${res.id}`);
-    router.refresh();
   }
 
   return (
@@ -347,8 +412,8 @@ export function PostComposer() {
           Cancel
         </Button>
         {busy && (
-          <span className="text-xs text-zinc-500">
-            Keep this page open until it finishes.
+          <span className="text-xs text-zinc-500" role="status">
+            {status ?? "Working…"} Keep this page open until it finishes.
           </span>
         )}
       </div>
