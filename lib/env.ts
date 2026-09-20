@@ -6,8 +6,14 @@
  * at request time.
  */
 
-function required(name: string): string {
-  const value = process.env[name];
+/**
+ * `value` defaults to a runtime lookup, which is fine on the server. Anything
+ * that must also work in the BROWSER has to pass the literal
+ * `process.env.NEXT_PUBLIC_X` instead: Next.js only bakes a public variable
+ * into browser code when it is written out in full, so a lookup by name
+ * (`process.env[name]`) is empty in the browser and would throw.
+ */
+function required(name: string, value: string | undefined = process.env[name]): string {
   if (!value || value.trim() === "") {
     throw new Error(
       `Missing required environment variable: ${name}. See .env.example.`,
@@ -18,10 +24,16 @@ function required(name: string): string {
 
 export const publicEnv = {
   get supabaseUrl() {
-    return required("NEXT_PUBLIC_SUPABASE_URL");
+    return required(
+      "NEXT_PUBLIC_SUPABASE_URL",
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+    );
   },
   get supabaseAnonKey() {
-    return required("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    return required(
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    );
   },
   get siteUrl() {
     return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
