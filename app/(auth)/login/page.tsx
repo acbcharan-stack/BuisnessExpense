@@ -9,9 +9,11 @@ export const metadata: Metadata = { title: `Sign in · ${APP_NAME}` };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; reset?: string }>;
+  searchParams: Promise<{ next?: string; reset?: string; why?: string }>;
 }) {
-  const { next, reset } = await searchParams;
+  const { next, reset, why } = await searchParams;
+  // Only ever show a short plain label, never arbitrary text from the address.
+  const reason = why && /^[A-Za-z0-9_]{1,60}$/.test(why) ? why : null;
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-zinc-50 px-4 py-10 dark:bg-zinc-950">
@@ -34,6 +36,11 @@ export default async function LoginPage({
             used already, or been opened in a different browser than the one you
             requested it from. Request a new link below and open it in the same
             browser.
+            {reason ? (
+              <span className="mt-1 block text-xs opacity-80">
+                Reason code: {reason}
+              </span>
+            ) : null}
           </p>
         ) : null}
         <Suspense>
