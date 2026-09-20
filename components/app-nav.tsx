@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/inbox", label: "Inbox", icon: "inbox" },
   { href: "/invoices", label: "Purchase Orders", icon: "invoice" },
   { href: "/expenses", label: "Expenses", icon: "expense" },
+  { href: "/social", label: "Social Media Posts & Videos", icon: "image" },
   { href: "/settings", label: "Settings", icon: "settings" },
 ];
 

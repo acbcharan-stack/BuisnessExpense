@@ -49,3 +49,5 @@ export const STORAGE_BUCKET = "documents";
 export const ASSET_BUCKET = "business-assets";
 /** Rendered PDFs produced by the purchase-order-to-invoice conversion flow. */
 export const GENERATED_INVOICE_BUCKET = "generated-invoices";
+/** Photos and videos on the Social Media Posts & Videos board. */
+export const SOCIAL_BUCKET = "social-media";

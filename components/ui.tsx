@@ -87,6 +87,22 @@ const PATHS: Record<string, React.ReactNode> = {
       <path d="M14 2v6h6" />
     </>
   ),
+  image: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="m21 15-5-5L5 21" />
+    </>
+  ),
+  video: (
+    <>
+      <rect x="2" y="6" width="14" height="12" rx="2" />
+      <path d="m22 8-6 4 6 4Z" />
+    </>
+  ),
+  message: (
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" />
+  ),
   plus: <path d="M12 5v14M5 12h14" />,
   x: <path d="M18 6 6 18M6 6l12 12" />,
   clock: (

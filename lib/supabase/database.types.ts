@@ -256,6 +256,39 @@ export type GeneratedInvoiceTaxRow = {
   jurisdiction: string | null;
 };
 
+export type SocialMediaKindDb = "image" | "video";
+export type SocialCommentKindDb = "comment" | "suggestion";
+
+export type SocialPostRow = {
+  id: string;
+  author_id: string | null;
+  title: string;
+  caption: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SocialPostMediaRow = {
+  id: string;
+  post_id: string;
+  position: number;
+  storage_path: string;
+  kind: SocialMediaKindDb;
+  mime_type: string;
+  size_bytes: number;
+  original_name: string | null;
+  created_at: string;
+};
+
+export type SocialPostCommentRow = {
+  id: string;
+  post_id: string;
+  author_id: string | null;
+  kind: SocialCommentKindDb;
+  body: string;
+  created_at: string;
+};
+
 export type AuditLogRow = {
   id: number;
   actor_id: string | null;
@@ -289,6 +322,9 @@ export type Database = {
       generated_invoice_line_items: TableShape<GeneratedInvoiceLineItemRow>;
       generated_invoice_taxes: TableShape<GeneratedInvoiceTaxRow>;
       invoice_number_counters: TableShape<InvoiceNumberCounterRow>;
+      social_posts: TableShape<SocialPostRow>;
+      social_post_media: TableShape<SocialPostMediaRow>;
+      social_post_comments: TableShape<SocialPostCommentRow>;
       audit_log: TableShape<AuditLogRow>;
     };
     Views: Record<string, never>;

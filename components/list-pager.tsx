@@ -13,10 +13,13 @@ export function ListPager({
   page,
   pageCount,
   total,
+  noun = "record",
 }: {
   page: number;
   pageCount: number;
   total: number;
+  /** What is being counted, singular (default "record"). */
+  noun?: string;
 }) {
   const pathname = usePathname();
   const params = useSearchParams();
@@ -42,7 +45,7 @@ export function ListPager({
   return (
     <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
       <span className="tabular-nums">
-        Page {page} of {pageCount} · {total.toLocaleString("en-IN")} record
+        Page {page} of {pageCount} · {total.toLocaleString("en-IN")} {noun}
         {total === 1 ? "" : "s"}
       </span>
       <div className="flex gap-1.5">
