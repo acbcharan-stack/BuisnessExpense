@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env";
 import type { Database } from "@/lib/supabase/database.types";
+import { recoveryForwardUrl } from "@/lib/supabase/recovery";
 
 /** Paths that never require an authenticated session. */
 const PUBLIC_PREFIXES = [
@@ -22,6 +23,10 @@ function isPublicPath(pathname: string): boolean {
  * routes. Run from the root `proxy.ts` (Next.js 16's renamed middleware).
  */
 export async function updateSession(request: NextRequest) {
+  // A reset link that landed on the home page / login instead of /auth/reset.
+  const forward = recoveryForwardUrl(request.nextUrl);
+  if (forward) return NextResponse.redirect(forward);
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient<Database>(
