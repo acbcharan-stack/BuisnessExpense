@@ -152,8 +152,10 @@ export function PostComposer() {
     let postId: string | null = null;
     let published = false;
     let failedKey: string | null = null;
+    let step = "getting ready";
     try {
       // 1. Ask the server for one upload slip per file.
+      step = "asking the server for upload permission";
       const prep = await prepareSocialUpload({
         files: picked.map((p) => ({ type: p.mime, size: p.file.size })),
       });
@@ -167,6 +169,7 @@ export function PostComposer() {
         const p = picked[i];
         const slip = prep.uploads[i];
         setState(p.key, "uploading");
+        step = `uploading ${p.file.name}`;
         setStatus(
           `Uploading file ${i + 1} of ${picked.length} (${formatBytes(p.file.size)})` +
             " — large videos can take a few minutes.",
@@ -197,6 +200,7 @@ export function PostComposer() {
       }
 
       // 3. Publish the post.
+      step = "publishing the post";
       setStatus("Publishing…");
       const res = await publishSocialPost({
         postId: prep.postId,
@@ -214,10 +218,14 @@ export function PostComposer() {
       router.push(`/social/${res.id}`);
       router.refresh();
     } catch (err) {
+      console.error("Social post failed while", step, err);
+      // Name the step and the error so a failure can be diagnosed from a
+      // screenshot (browser-side errors carry no secrets).
+      const detail = err instanceof Error && err.message ? err.message : "unknown error";
       setError(
         err instanceof UploadFailure
           ? err.message
-          : "Something went wrong and nothing was posted. Check your connection and try again.",
+          : `Something went wrong while ${step}, and nothing was posted. (${detail})`,
       );
     } finally {
       if (!published) {
