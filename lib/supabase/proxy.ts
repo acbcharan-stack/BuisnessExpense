@@ -59,7 +59,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && pathname === "/login") {
+  // A signed-in user is normally bounced off /login, but not when a reset link
+  // just failed — otherwise the failure is hidden and they land in the app
+  // with no explanation (the login page shows the notice).
+  if (
+    user &&
+    pathname === "/login" &&
+    !request.nextUrl.searchParams.has("reset")
+  ) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/dashboard";
     redirectUrl.search = "";
