@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
-import { Badge, Card, Icon } from "@/components/ui";
+import { Badge, Card, Icon, Spinner } from "@/components/ui";
 import { RECORD_TYPE_LABELS_SHORT } from "@/lib/types";
 import { APP_NAME } from "@/lib/constants";
 import { friendlyStoredError } from "@/lib/gemini/errors";
@@ -137,7 +137,13 @@ export default async function InboxPage() {
               const label = (
                 <span className="block min-w-0 flex-1">
                   <span className="block truncate">{name}</span>
-                  {problem ? (
+                  {d.status === "processing" ? (
+                    <span className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
+                      <Spinner className="size-3" />
+                      Reading the document — this can take up to a minute when
+                      the AI is busy. Refresh to see the result.
+                    </span>
+                  ) : problem ? (
                     <span className="block break-words text-xs text-red-600 dark:text-red-400">
                       {problem}
                     </span>

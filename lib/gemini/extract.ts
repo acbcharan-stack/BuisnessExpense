@@ -15,7 +15,7 @@ import {
 // download and database writes around the AI call.
 const MAX_CALL_ATTEMPTS = 4;
 const CALL_BUDGET_MS = 40_000;
-const MAX_ATTEMPT_MS = 25_000;
+const MAX_ATTEMPT_MS = 18_000;
 const MIN_ATTEMPT_MS = 6_000;
 
 export interface ExtractionOutcome {
