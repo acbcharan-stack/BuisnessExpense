@@ -10,7 +10,7 @@ export interface FailoverOptions<T> {
   minAttemptMs: number;
   /** Ceiling for one attempt's own timeout. */
   maxAttemptMs: number;
-  call: (model: string, timeoutMs: number) => Promise<T>;
+  call: (model: string, timeoutMs: number, attempt: number) => Promise<T>;
   /** Injectable for tests. */
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
@@ -46,7 +46,7 @@ export async function runWithFailover<T>(
     const model = rotation[attempt % rotation.length];
     const timeoutMs = Math.max(1000, Math.min(opts.maxAttemptMs, remaining));
     try {
-      const value = await opts.call(model, timeoutMs);
+      const value = await opts.call(model, timeoutMs, attempt);
       return { value, model };
     } catch (err) {
       lastError = err;

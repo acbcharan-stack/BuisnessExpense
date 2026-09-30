@@ -48,13 +48,16 @@ export async function extractDocument(params: {
     models.push(geminiFallbackModel.trim());
   }
 
-  const { value: rawText, model } = await runWithFailover({
+  // Reading the answer is part of the retried step: if the model hands back
+  // malformed JSON (it happens on long documents), we ask again instead of
+  // failing the file.
+  const { value, model } = await runWithFailover({
     models,
     maxAttempts: MAX_CALL_ATTEMPTS,
     budgetMs: CALL_BUDGET_MS,
     minAttemptMs: MIN_ATTEMPT_MS,
     maxAttemptMs: MAX_ATTEMPT_MS,
-    call: async (modelName, timeoutMs) => {
+    call: async (modelName, timeoutMs, attempt) => {
       const response = await ai.models.generateContent({
         model: modelName,
         contents: [
@@ -70,43 +73,50 @@ export async function extractDocument(params: {
           responseMimeType: "application/json",
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           responseSchema: geminiResponseSchema as any,
-          temperature: 0,
+          // Deterministic first try; a little variation on retries so a
+          // repeated glitch isn't reproduced exactly.
+          temperature: attempt === 0 ? 0 : 0.3,
           maxOutputTokens: 8192,
           // One HTTP attempt per call: retries are ours, so the time budget holds.
           httpOptions: { timeout: timeoutMs, retryOptions: { attempts: 1 } },
         },
       });
 
-      const finish = response.candidates?.[0]?.finishReason;
       const text = response.text ?? "";
       if (!text.trim()) {
         throw new ExtractionError(
           "The AI returned an empty answer for this document. Press Retry.",
         );
       }
-      if (finish === "MAX_TOKENS") {
+      if (response.candidates?.[0]?.finishReason === "MAX_TOKENS") {
         throw new ExtractionError(
           "The AI's answer was cut off (very long document). Press Retry, or enter it manually.",
         );
       }
-      return text;
+      return { rawText: text, parsed: parseModelAnswer(text) };
     },
   });
 
+  return { parsed: value.parsed, rawText: value.rawText, model };
+}
+
+function parseModelAnswer(rawText: string): ExtractionResult {
+  const notReadable = () =>
+    new ExtractionError("The AI's answer was not in the expected format.");
   let json: unknown;
   try {
     json = JSON.parse(rawText);
   } catch {
     // Occasionally the model wraps JSON in ```json fences despite the mime type.
     const fenced = rawText.match(/\{[\s\S]*\}/);
-    if (!fenced) throw new ExtractionError("The AI's answer was not in the expected format. Press Retry.");
+    if (!fenced) throw notReadable();
     try {
       json = JSON.parse(fenced[0]);
     } catch {
-      throw new ExtractionError("The AI's answer was not in the expected format. Press Retry.");
+      throw notReadable();
     }
   }
-
-  const parsed = extractionResultSchema.parse(json);
-  return { parsed, rawText, model };
+  const result = extractionResultSchema.safeParse(json);
+  if (!result.success) throw notReadable();
+  return result.data;
 }
