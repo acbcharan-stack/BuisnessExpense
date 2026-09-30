@@ -2,7 +2,13 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ACCEPTED_MIME_TYPES } from "@/lib/constants";
+import {
+  ACCEPTED_MIME_TYPES,
+  DIRECT_UPLOAD_MIME_TYPES,
+  MAX_UPLOAD_BYTES,
+  STORAGE_BUCKET,
+} from "@/lib/constants";
+import { createClient } from "@/lib/supabase/client";
 import { Icon, Spinner } from "@/components/ui";
 
 type ItemState = "uploading" | "done" | "duplicate" | "error";
@@ -21,6 +27,74 @@ const DOT: Record<ItemState, string> = {
   error: "bg-red-500",
 };
 
+interface ApiReply {
+  error?: string;
+  duplicate?: boolean;
+  resumed?: boolean;
+  jobStatus?: string;
+  expenseId?: string | null;
+}
+
+interface Sent {
+  ok: boolean;
+  status: number;
+  data: ApiReply | null;
+}
+
+const DIRECT_TYPES: readonly string[] = DIRECT_UPLOAD_MIME_TYPES;
+
+async function postJson(url: string, payload: unknown): Promise<Sent> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = (await res.json().catch(() => null)) as ApiReply | null;
+  return { ok: res.ok, status: res.status, data };
+}
+
+/**
+ * Images go straight from the browser to storage (no size cap from the app
+ * host); the server then inspects the stored file. Anything else, or any hiccup
+ * getting a slip, goes the classic way through the app server.
+ */
+async function sendFile(file: File): Promise<Sent> {
+  if (DIRECT_TYPES.includes(file.type)) {
+    const slip = await postJson("/api/documents/upload-url", {
+      filename: file.name,
+      type: file.type,
+      size: file.size,
+    });
+    const token = (slip.data as { token?: string; path?: string } | null) ?? null;
+    if (!slip.ok || !token?.token || !token.path) return slip;
+
+    // Re-wrap so the declared type sticks (some browsers report "" or a
+    // different type); no data is copied.
+    const body = new Blob([file], { type: file.type });
+    const { error } = await createClient()
+      .storage.from(STORAGE_BUCKET)
+      .uploadToSignedUrl(token.path, token.token, body, { contentType: file.type });
+    if (error) {
+      return {
+        ok: false,
+        status: 502,
+        data: { error: "Upload failed. Check your connection and try again." },
+      };
+    }
+    return postJson("/api/documents/finalize", {
+      path: token.path,
+      filename: file.name,
+    });
+  }
+
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/documents", { method: "POST", body: form });
+  // A gateway error page (e.g. 413 from the host) is not JSON — don't crash on it.
+  const data = (await res.json().catch(() => null)) as ApiReply | null;
+  return { ok: res.ok, status: res.status, data };
+}
+
 export function UploadDropzone() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -29,24 +103,28 @@ export function UploadDropzone() {
   const [busy, setBusy] = useState(false);
 
   const uploadOne = useCallback(async (file: File): Promise<UploadItem> => {
-    const body = new FormData();
-    body.append("file", file);
+    // UX-only pre-checks; the server re-validates everything.
+    if (file.size === 0) {
+      return { name: file.name, state: "error", message: "That file is empty." };
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return { name: file.name, state: "error", message: "File is larger than 25 MB." };
+    }
+
     try {
-      const res = await fetch("/api/documents", { method: "POST", body });
-      const data = (await res.json()) as {
-        error?: string;
-        duplicate?: boolean;
-        jobStatus?: string;
-        expenseId?: string | null;
-      };
-      if (!res.ok) {
+      const { ok, status, data } = await sendFile(file);
+      if (!ok || !data) {
         return {
           name: file.name,
           state: "error",
-          message: data.error ?? res.statusText,
+          message:
+            data?.error ??
+            (status === 413
+              ? "File is too large to upload."
+              : `Upload failed (${status}). Please try again.`),
         };
       }
-      if (data.duplicate) {
+      if (data.duplicate && !data.resumed) {
         return {
           name: file.name,
           state: "duplicate",
@@ -54,11 +132,18 @@ export function UploadDropzone() {
           expenseId: data.expenseId,
         };
       }
+      if (data.jobStatus === "busy") {
+        return {
+          name: file.name,
+          state: "error",
+          message: "Already being processed — check the list below in a moment.",
+        };
+      }
       if (data.jobStatus === "error") {
         return {
           name: file.name,
           state: "error",
-          message: data.error ?? "Extraction failed — retry from the list below.",
+          message: data.error ?? "Extraction failed — press Retry in the list below.",
         };
       }
       return {
@@ -67,11 +152,11 @@ export function UploadDropzone() {
         message: "Extracted — ready for review.",
         expenseId: data.expenseId,
       };
-    } catch (err) {
+    } catch {
       return {
         name: file.name,
         state: "error",
-        message: err instanceof Error ? err.message : "Network error",
+        message: "Network problem — check your connection and try again.",
       };
     }
   }, []);

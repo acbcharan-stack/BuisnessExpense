@@ -44,6 +44,20 @@ export const ACCEPTED_MIME_TYPES = [
   "application/pdf",
 ] as const;
 
+/**
+ * Types the browser sends straight to Supabase Storage (bypassing the app
+ * server, whose host caps request bodies at a few MB). Everything else still
+ * goes through `POST /api/documents`. The server re-checks the real bytes
+ * either way, so this list only decides the route, never what is trusted.
+ */
+export const DIRECT_UPLOAD_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+] as const;
+
 export const STORAGE_BUCKET = "documents";
 /** Durable per-business branding assets (signatures, logos) — not scanned documents. */
 export const ASSET_BUCKET = "business-assets";

@@ -12,21 +12,27 @@ export function RetryButton({ documentId }: { documentId: string }) {
   function retry() {
     setError(null);
     startTransition(async () => {
-      const res = await fetch(`/api/documents/${documentId}/retry`, {
-        method: "POST",
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok || data.error) {
-        setError(data.error ?? "Retry failed");
-        return;
+      try {
+        const res = await fetch(`/api/documents/${documentId}/retry`, {
+          method: "POST",
+        });
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        if (!res.ok || data?.error) {
+          setError(data?.error ?? "Retry failed. Please try again.");
+        }
+      } catch {
+        setError("Network problem — please try again.");
       }
+      // Refresh either way: a failed retry also updates the saved message.
       router.refresh();
     });
   }
 
   return (
     <span className="flex items-center gap-2">
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && (
+        <span className="max-w-56 text-xs text-red-600 dark:text-red-400">{error}</span>
+      )}
       <Button
         size="sm"
         variant="secondary"

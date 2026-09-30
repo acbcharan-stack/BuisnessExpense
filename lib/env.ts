@@ -52,6 +52,8 @@ export function getServerEnv() {
     supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
     geminiApiKey: required("GEMINI_API_KEY"),
     geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.6-flash",
+    // Used when the primary model is overloaded (503). Set to "" to disable.
+    geminiFallbackModel: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-flash-latest",
     inboundEmailSecret: process.env.INBOUND_EMAIL_SECRET ?? "",
     inboundEmailAllowlist: (process.env.INBOUND_EMAIL_ALLOWLIST ?? "")
       .split(",")

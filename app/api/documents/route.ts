@@ -1,124 +1,51 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireApiUser } from "@/lib/supabase/api-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { runExtractionJob } from "@/lib/extraction/pipeline";
-import { sha256Hex, extensionForMime } from "@/lib/hash";
-import {
-  ACCEPTED_MIME_TYPES,
-  MAX_UPLOAD_BYTES,
-  STORAGE_BUCKET,
-} from "@/lib/constants";
+import { ingestDocument } from "@/lib/documents/ingest";
+import { MAX_UPLOAD_BYTES } from "@/lib/constants";
 
 export const maxDuration = 60;
 
+/** Multipart framing adds a little on top of the file itself. */
+const BODY_OVERHEAD_BYTES = 1024 * 1024;
+
+function fail(error: string, status: number) {
+  return NextResponse.json({ error }, { status });
+}
+
+/**
+ * Upload path for files sent through the app server (PDFs). Images go straight
+ * to storage instead — see ./upload-url and ./finalize.
+ */
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  // 1. Who is this? Verified token + profile, on every request.
+  const user = await requireApiUser();
+  if (!user) return fail("Not signed in.", 401);
+
+  // 2. Cheap size check on the declared length before reading the body.
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_UPLOAD_BYTES + BODY_OVERHEAD_BYTES) {
+    return fail("File is larger than 25 MB.", 413);
   }
 
-  const form = await request.formData();
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return fail("Could not read the upload. Please try again.", 400);
+  }
   const file = form.get("file");
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "No file provided." }, { status: 400 });
-  }
+  if (!(file instanceof File)) return fail("No file provided.", 400);
+  if (file.size === 0) return fail("That file is empty.", 400);
+  if (file.size > MAX_UPLOAD_BYTES) return fail("File is larger than 25 MB.", 413);
 
-  const mimeType = file.type || "application/octet-stream";
-  if (!ACCEPTED_MIME_TYPES.includes(mimeType as (typeof ACCEPTED_MIME_TYPES)[number])) {
-    return NextResponse.json(
-      { error: `Unsupported file type: ${mimeType}` },
-      { status: 415 },
-    );
-  }
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return NextResponse.json(
-      { error: "File is larger than 25 MB." },
-      { status: 413 },
-    );
-  }
-
+  // 3. Type, size (again, on the real bytes), de-dupe, store, extract.
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const sha256 = sha256Hex(bytes);
-
-  // De-dupe: same bytes already uploaded?
-  const { data: dupe } = await supabase
-    .from("documents")
-    .select("id, status")
-    .eq("sha256", sha256)
-    .maybeSingle();
-  if (dupe) {
-    const { data: dupeExpense } = await supabase
-      .from("expenses")
-      .select("id")
-      .eq("document_id", dupe.id)
-      .maybeSingle();
-    return NextResponse.json({
-      documentId: dupe.id,
-      expenseId: dupeExpense?.id ?? null,
-      duplicate: true,
-      jobStatus: dupe.status,
-    });
-  }
-
-  const admin = createAdminClient();
-  const path = `${crypto.randomUUID()}.${extensionForMime(mimeType)}`;
-
-  const { error: uploadError } = await admin.storage
-    .from(STORAGE_BUCKET)
-    .upload(path, bytes, { contentType: mimeType, upsert: false });
-  if (uploadError) {
-    return NextResponse.json(
-      { error: `Upload failed: ${uploadError.message}` },
-      { status: 502 },
-    );
-  }
-
-  const { data: doc, error: docError } = await admin
-    .from("documents")
-    .insert({
-      storage_path: path,
-      original_filename: file.name,
-      mime_type: mimeType,
-      size_bytes: file.size,
-      sha256,
-      source: "upload",
-      uploaded_by: user.id,
-      status: "uploaded",
-    })
-    .select("id")
-    .single();
-  if (docError || !doc) {
-    await admin.storage.from(STORAGE_BUCKET).remove([path]);
-    return NextResponse.json(
-      { error: `Could not record document: ${docError?.message}` },
-      { status: 500 },
-    );
-  }
-
-  const { data: job, error: jobError } = await admin
-    .from("extraction_jobs")
-    .insert({ document_id: doc.id, status: "queued" })
-    .select("id")
-    .single();
-  if (jobError || !job) {
-    return NextResponse.json(
-      { error: `Could not queue extraction: ${jobError?.message}` },
-      { status: 500 },
-    );
-  }
-
-  // Extract inline so the UI can show a result immediately. If it fails the job
-  // is left for the retry sweep / manual retry.
-  const result = await runExtractionJob(admin, job.id);
-
-  return NextResponse.json({
-    documentId: doc.id,
-    expenseId: result.expenseId ?? null,
-    duplicate: false,
-    jobStatus: result.status,
-    error: result.status === "error" ? result.error : undefined,
+  const { status, body } = await ingestDocument({
+    admin: createAdminClient(),
+    userId: user.id,
+    bytes,
+    filename: file.name,
   });
+  return NextResponse.json(body, { status });
 }

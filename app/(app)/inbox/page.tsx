@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge, Card, Icon } from "@/components/ui";
 import { RECORD_TYPE_LABELS_SHORT } from "@/lib/types";
 import { APP_NAME } from "@/lib/constants";
+import { friendlyStoredError } from "@/lib/gemini/errors";
 import { UploadDropzone } from "./upload-dropzone";
 import { RetryButton } from "./retry-button";
 
@@ -37,6 +38,18 @@ export default async function InboxPage() {
       .order("created_at", { ascending: false })
       .limit(30),
   ]);
+
+  // Which uploads already have a record to review? (documents -> expenses)
+  const documentIds = (documents ?? []).map((d) => d.id);
+  const { data: linked } = documentIds.length
+    ? await supabase
+        .from("expenses")
+        .select("id, document_id")
+        .in("document_id", documentIds)
+    : { data: [] as { id: string; document_id: string | null }[] };
+  const expenseByDocument = new Map(
+    (linked ?? []).flatMap((e) => (e.document_id ? [[e.document_id, e.id] as const] : [])),
+  );
 
   return (
     <>
@@ -114,18 +127,19 @@ export default async function InboxPage() {
           <Card className="p-4 text-sm text-zinc-500">No uploads yet.</Card>
         ) : (
           <Card className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {documents.map((d) => (
-              <div
-                key={d.id}
-                className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate">
-                    {d.original_filename ?? d.id}
-                  </span>
-                  {d.status === "failed" && d.error ? (
-                    <span className="block truncate text-xs text-red-600">
-                      {d.error}
+            {documents.map((d) => {
+              const expenseId = expenseByDocument.get(d.id);
+              const problem =
+                d.status === "failed" || d.status === "uploaded"
+                  ? friendlyStoredError(d.error)
+                  : null;
+              const name = d.original_filename?.trim() || "Untitled upload";
+              const label = (
+                <span className="block min-w-0 flex-1">
+                  <span className="block truncate">{name}</span>
+                  {problem ? (
+                    <span className="block break-words text-xs text-red-600 dark:text-red-400">
+                      {problem}
                     </span>
                   ) : (
                     <span className="text-xs text-zinc-400">
@@ -133,14 +147,40 @@ export default async function InboxPage() {
                     </span>
                   )}
                 </span>
-                <span className="flex shrink-0 items-center gap-3">
-                  <Badge tone="status">{d.status}</Badge>
-                  {(d.status === "failed" || d.status === "uploaded") && (
-                    <RetryButton documentId={d.id} />
+              );
+              return (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
+                >
+                  {expenseId ? (
+                    <Link
+                      href={`/records/${expenseId}`}
+                      className="flex min-w-0 flex-1 items-center gap-2 hover:underline"
+                    >
+                      {label}
+                    </Link>
+                  ) : (
+                    label
                   )}
-                </span>
-              </div>
-            ))}
+                  <span className="flex shrink-0 items-center gap-3">
+                    <Badge tone="status">{d.status}</Badge>
+                    {expenseId ? (
+                      <Link
+                        href={`/records/${expenseId}`}
+                        className="text-xs font-medium text-blue-600 underline underline-offset-2 dark:text-blue-400"
+                      >
+                        Review
+                      </Link>
+                    ) : (
+                      (d.status === "failed" || d.status === "uploaded") && (
+                        <RetryButton documentId={d.id} />
+                      )
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </Card>
         )}
       </section>
