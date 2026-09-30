@@ -37,6 +37,19 @@ describe("classifyExtractionError", () => {
     expect(classifyExtractionError(withStatus(400)).kind).toBe("permanent");
   });
 
+  it("shows the provider's reason when a file is rejected (and only then)", () => {
+    const rejected = classifyExtractionError(
+      Object.assign(
+        new Error('{"error":{"code":400,"message":"The document has no pages.\\n","status":"INVALID_ARGUMENT"}}'),
+        { status: 400 },
+      ),
+    );
+    expect(rejected.message).toContain("The document has no pages.");
+    expect(rejected.message).not.toContain("{");
+    const busy = classifyExtractionError(Object.assign(new Error(RAW_503), { status: 503 }));
+    expect(busy.message).not.toContain("Reason given");
+  });
+
   it("recognises network failures", () => {
     const out = classifyExtractionError(new TypeError("fetch failed"));
     expect(out.kind).toBe("transient");

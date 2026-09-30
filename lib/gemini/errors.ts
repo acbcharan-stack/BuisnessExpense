@@ -73,6 +73,28 @@ function statusFromText(text: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/**
+ * The provider's own one-line reason (e.g. "The document has no pages"), made
+ * safe to show: control characters removed, whitespace collapsed, length capped.
+ * Only used for "your file was rejected" errors, where the reason is what lets
+ * someone fix the file.
+ */
+function providerReason(raw: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    const msg = (parsed as { error?: { message?: unknown } } | null)?.error?.message;
+    if (typeof msg !== "string") return null;
+    const clean = msg
+      .replace(/[\u0000-\u001f\u007f]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 160);
+    return clean || null;
+  } catch {
+    return null;
+  }
+}
+
 const NETWORK_RE =
   /fetch failed|econnreset|econnrefused|enotfound|etimedout|socket hang up|network/i;
 
@@ -93,7 +115,14 @@ export function classifyExtractionError(err: unknown): ClassifiedFailure {
     err && typeof err === "object" && typeof (err as { status?: unknown }).status === "number"
       ? (err as { status: number }).status
       : statusFromText(raw);
-  if (status !== null) return { ...fromStatus(status), detail };
+  if (status !== null) {
+    const base = fromStatus(status);
+    if (base.message === MESSAGES.rejected) {
+      const reason = providerReason(raw);
+      if (reason) return { ...base, message: `${MESSAGES.rejected} Reason given: ${reason}`, detail };
+    }
+    return { ...base, detail };
+  }
 
   if (err instanceof Error && err.name === "ZodError") {
     return { kind: "transient", message: MESSAGES.unreadable, detail };
