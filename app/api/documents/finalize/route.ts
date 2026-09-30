@@ -8,9 +8,9 @@ import { MAX_UPLOAD_BYTES, STORAGE_BUCKET } from "@/lib/constants";
 export const maxDuration = 60;
 
 /**
- * Step 2 of a direct image upload. The browser claims "it's uploaded". We don't
+ * Step 2 of a direct upload. The browser claims "it's uploaded". We don't
  * take its word: we fetch the stored file ourselves, check what it really is,
- * and delete it if it isn't a genuine image — then carry on exactly like a
+ * and delete it if it isn't a genuine image or PDF — then carry on exactly like a
  * normal upload (de-dupe, record, extract).
  *
  * Metaphor: after the visitor drops a parcel in the locker, staff open it and

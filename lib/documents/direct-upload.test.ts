@@ -11,9 +11,16 @@ describe("prepareUploadSchema", () => {
     ).toBe(true);
   });
 
-  it("rejects PDFs, oversize, empty, fractional and non-numeric sizes", () => {
+  it("accepts PDFs", () => {
+    expect(
+      prepareUploadSchema.safeParse({ filename: "a.pdf", type: "application/pdf", size: 9_000_000 })
+        .success,
+    ).toBe(true);
+  });
+
+  it("rejects other types, oversize, empty, fractional and non-numeric sizes", () => {
     const base = { filename: "a", type: "image/png", size: 10 };
-    expect(prepareUploadSchema.safeParse({ ...base, type: "application/pdf" }).success).toBe(false);
+    expect(prepareUploadSchema.safeParse({ ...base, type: "text/html" }).success).toBe(false);
     expect(prepareUploadSchema.safeParse({ ...base, size: 26 * 1024 * 1024 }).success).toBe(false);
     expect(prepareUploadSchema.safeParse({ ...base, size: 0 }).success).toBe(false);
     expect(prepareUploadSchema.safeParse({ ...base, size: 1.5 }).success).toBe(false);
@@ -24,13 +31,14 @@ describe("prepareUploadSchema", () => {
 describe("finalizeUploadSchema", () => {
   it("accepts only server-style names", () => {
     expect(finalizeUploadSchema.safeParse({ path: `${UUID}.png`, filename: "x" }).success).toBe(true);
+    expect(finalizeUploadSchema.safeParse({ path: `${UUID}.pdf`, filename: "x" }).success).toBe(true);
   });
 
   it("rejects paths that could reach other files", () => {
     for (const path of [
       `../${UUID}.png`,
       `folder/${UUID}.png`,
-      `${UUID}.pdf`,
+      `${UUID}.exe`,
       `${UUID}.png/../x`,
       "secret.png",
       `${UUID}.png\n`,

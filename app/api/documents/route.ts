@@ -14,8 +14,9 @@ function fail(error: string, status: number) {
 }
 
 /**
- * Upload path for files sent through the app server (PDFs). Images go straight
- * to storage instead — see ./upload-url and ./finalize.
+ * Fallback upload path through the app server (size-capped by the host). The
+ * Inbox sends files straight to storage instead — see ./upload-url and
+ * ./finalize — and only lands here if the browser can't tell the file's type.
  */
 export async function POST(request: Request) {
   // 1. Who is this? Verified token + profile, on every request.

@@ -54,9 +54,9 @@ async function postJson(url: string, payload: unknown): Promise<Sent> {
 }
 
 /**
- * Images go straight from the browser to storage (no size cap from the app
- * host); the server then inspects the stored file. Anything else, or any hiccup
- * getting a slip, goes the classic way through the app server.
+ * Images and PDFs go straight from the browser to storage (no size cap from the
+ * app host); the server then inspects the stored file. A file whose type the
+ * browser can't report goes the classic way through the app server.
  */
 async function sendFile(file: File): Promise<Sent> {
   if (DIRECT_TYPES.includes(file.type)) {

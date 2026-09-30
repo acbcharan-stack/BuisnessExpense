@@ -6,7 +6,7 @@ import { extensionForMime } from "@/lib/hash";
 import { STORAGE_BUCKET } from "@/lib/constants";
 
 /**
- * Step 1 of a direct image upload. The browser says "I have an image of this
+ * Step 1 of a direct upload. The browser says "I have a file of this
  * type and size"; we invent the file name and hand back a one-use upload slip.
  *
  * Metaphor: the front desk gives the visitor a key to ONE numbered locker. They
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   );
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Unsupported image, or larger than 25 MB." },
+      { error: "Unsupported file type, or larger than 25 MB." },
       { status: 400 },
     );
   }

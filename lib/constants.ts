@@ -56,6 +56,7 @@ export const DIRECT_UPLOAD_MIME_TYPES = [
   "image/webp",
   "image/heic",
   "image/heif",
+  "application/pdf",
 ] as const;
 
 export const STORAGE_BUCKET = "documents";
