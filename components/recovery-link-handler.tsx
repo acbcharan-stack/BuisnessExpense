@@ -19,6 +19,15 @@ export function RecoveryLinkHandler() {
 
   useEffect(() => {
     const hash = window.location.hash;
+
+    // A dead link comes back as `#error=access_denied&error_code=otp_expired`.
+    // Only the browser can see that, so turn it into the login page's notice.
+    const errorCode = new URLSearchParams(hash.replace(/^#/, "")).get("error_code");
+    if (errorCode && /^[A-Za-z0-9_]{1,60}$/.test(errorCode)) {
+      router.replace(`/login?reset=invalid&why=${errorCode}`);
+      return;
+    }
+
     if (!hash.includes("access_token=") || !/[#&]type=recovery(&|$)/.test(hash)) {
       return;
     }

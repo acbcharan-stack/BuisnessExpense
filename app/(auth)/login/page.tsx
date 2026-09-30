@@ -16,7 +16,9 @@ export default async function LoginPage({
   const reason = why && /^[A-Za-z0-9_]{1,60}$/.test(why) ? why : null;
   // A plain-language cause for the reasons we know how to explain.
   const reasonHelp =
-    reason === "bad_code_verifier"
+    reason === "otp_expired"
+      ? "This link has expired or was already used. Mail apps and security scanners often open links before you do, which uses them up. Request a new link below and open it straight away — if it keeps failing, ask your administrator to set a password for you."
+      : reason === "bad_code_verifier"
       ? "This link belongs to an older reset request. Only the newest email works, and a failed try uses it up. Request one new link, wait for that email, and open only it — in this same browser."
       : reason === "AuthPKCECodeVerifierMissingError"
         ? "This browser doesn't have the request that goes with the link — it was probably opened in a different browser, profile, or a mail app's built-in browser. Request a new link here and open it in this same browser."
