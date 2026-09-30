@@ -23,9 +23,12 @@ Extract the data into the required JSON schema. Rules:
 - suggested_record_type:
     "invoice"  -> a supplier invoice / bill for goods or services, GST relevant
                   (raw material, tooling, coolant, spares, job work, freight,
-                  professional fees).
-    "expense"  -> a running cost bill such as electricity, wages / labour, rent,
-                  fuel, bank charges.
+                  professional fees). Any document that names a supplier
+                  and bills for goods or services (including purchase
+                  orders and tax invoices) is an "invoice".
+    "expense"  -> ONLY a running cost bill such as electricity, wages / labour,
+                  rent, fuel, bank charges, or a small till receipt.
+    When unsure, choose "invoice".
 - suggested_category: choose the single best fit from this list, or null:
   Raw Material – Metal/Bar Stock; Tooling & Inserts; Cutting Fluid/Coolant;
   Consumables; Machine Spares; Machine Maintenance/AMC; Subcontract / Job Work;
