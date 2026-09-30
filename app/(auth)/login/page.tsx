@@ -14,6 +14,13 @@ export default async function LoginPage({
   const { next, reset, why } = await searchParams;
   // Only ever show a short plain label, never arbitrary text from the address.
   const reason = why && /^[A-Za-z0-9_]{1,60}$/.test(why) ? why : null;
+  // A plain-language cause for the reasons we know how to explain.
+  const reasonHelp =
+    reason === "bad_code_verifier"
+      ? "This link belongs to an older reset request. Only the newest email works, and a failed try uses it up. Request one new link, wait for that email, and open only it — in this same browser."
+      : reason === "AuthPKCECodeVerifierMissingError"
+        ? "This browser doesn't have the request that goes with the link — it was probably opened in a different browser, profile, or a mail app's built-in browser. Request a new link here and open it in this same browser."
+        : null;
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-zinc-50 px-4 py-10 dark:bg-zinc-950">
@@ -36,6 +43,9 @@ export default async function LoginPage({
             used already, or been opened in a different browser than the one you
             requested it from. Request a new link below and open it in the same
             browser.
+            {reasonHelp ? (
+              <span className="mt-2 block font-medium">{reasonHelp}</span>
+            ) : null}
             {reason ? (
               <span className="mt-1 block text-xs opacity-80">
                 Reason code: {reason}
