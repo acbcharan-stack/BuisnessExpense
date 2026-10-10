@@ -51,7 +51,7 @@ export default async function SettingsPage() {
 
       <section className="mb-8">
         <h2 className="mb-2 text-sm font-semibold">
-          Your businesses{" "}
+          Business Details{" "}
           <span className="font-normal text-zinc-400">
             ({businesses?.length ?? 0})
           </span>

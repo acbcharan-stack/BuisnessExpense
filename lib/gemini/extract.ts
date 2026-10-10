@@ -116,7 +116,12 @@ function parseModelAnswer(rawText: string): ExtractionResult {
       throw notReadable();
     }
   }
+  // The model sometimes wraps the object in an array (one entry per page).
+  if (Array.isArray(json)) json = json.find((x) => x && typeof x === "object");
   const result = extractionResultSchema.safeParse(json);
-  if (!result.success) throw notReadable();
+  if (!result.success) {
+    console.error("Gemini answer failed validation:", rawText.slice(0, 300));
+    throw notReadable();
+  }
   return result.data;
 }

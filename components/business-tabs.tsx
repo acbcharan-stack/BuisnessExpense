@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LinkPending } from "@/components/link-pending";
 import { usePathname, useSearchParams } from "next/navigation";
 
 /**
@@ -48,6 +49,7 @@ export function BusinessTabs({
             }`}
           >
             {it.label}
+            <LinkPending />
           </Link>
         );
       })}

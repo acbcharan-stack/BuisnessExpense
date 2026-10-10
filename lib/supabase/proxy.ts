@@ -51,9 +51,10 @@ export async function updateSession(request: NextRequest) {
   );
 
   // IMPORTANT: getClaims()/getUser() must be called to trigger the refresh.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims verifies the JWT locally (no Auth-server round trip) when the
+  // project uses asymmetric signing keys, and falls back to the server otherwise.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims ?? null;
 
   const { pathname } = request.nextUrl;
 

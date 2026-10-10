@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LinkPending } from "@/components/link-pending";
 import { usePathname, useSearchParams } from "next/navigation";
 
 /**
@@ -44,6 +45,7 @@ export function RecordViewTabs() {
             }`}
           >
             {it.label}
+            <LinkPending />
           </Link>
         );
       })}

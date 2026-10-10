@@ -14,10 +14,8 @@ import type { ProfileRow } from "@/lib/supabase/database.types";
  */
 export const getCurrentUser = cache(async () => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+  const { data } = await supabase.auth.getClaims();
+  return data?.claims ? { id: data.claims.sub } : null;
 });
 
 /**

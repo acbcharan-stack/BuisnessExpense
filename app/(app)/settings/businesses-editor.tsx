@@ -47,6 +47,31 @@ const emptyRow: Row = {
   logoUrl: null,
 };
 
+/**
+ * Downscale big photos (long edge ≤ 1200px) so they fit the server-action body
+ * limit. PNGs stay PNG (transparency), everything else becomes JPEG. Falls back
+ * to the original file if the browser can't decode it.
+ */
+async function shrinkImage(file: File, maxEdge = 1200): Promise<File> {
+  if (file.size < 300 * 1024) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    const type = file.type === "image/png" ? "image/png" : "image/jpeg";
+    const blob = await new Promise<Blob | null>((r) =>
+      canvas.toBlob(r, type, 0.9),
+    );
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name, { type });
+  } catch {
+    return file;
+  }
+}
+
 /** A signature/logo file upload with a small preview, used inside a saved business's card. */
 function AssetUploader({
   businessId,
@@ -70,10 +95,17 @@ function AssetUploader({
     if (!file) return;
     setMsg(null);
     startTransition(async () => {
-      const formData = new FormData();
-      formData.set("file", file);
-      const res = await onUpload(businessId, formData);
-      if (!res.ok) setMsg(res.error ?? "Upload failed.");
+      try {
+        const small = await shrinkImage(file);
+        const formData = new FormData();
+        formData.set("file", small);
+        const res = await onUpload(businessId, formData);
+        if (!res.ok) setMsg(res.error ?? "Upload failed.");
+      } catch {
+        setMsg("Upload failed — the image may be too large. Try a smaller one.");
+      }
+      // Let the same file be picked again after a failure.
+      if (inputRef.current) inputRef.current.value = "";
       router.refresh();
     });
   }
@@ -298,14 +330,14 @@ function BusinessCard({ initial }: { initial: Row }) {
           <AssetUploader
             businessId={row.id}
             label="Logo"
-            previewUrl={row.logoUrl}
+            previewUrl={initial.logoUrl}
             onUpload={uploadBusinessLogo}
             onRemove={removeBusinessLogo}
           />
           <AssetUploader
             businessId={row.id}
             label="Authorized signature"
-            previewUrl={row.signatureUrl}
+            previewUrl={initial.signatureUrl}
             onUpload={uploadBusinessSignature}
             onRemove={removeBusinessSignature}
           />
